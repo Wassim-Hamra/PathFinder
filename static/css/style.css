@@ -1,0 +1,102 @@
+/* Route Optimizer Styles */
+
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+.loading-content {
+    text-align: center;
+    color: white;
+}
+
+.map-controls {
+    background: white;
+    border-radius: 5px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.leaflet-control-custom {
+    background: none;
+    border: none;
+}
+
+.route-marker {
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.start-marker {
+    background-color: #22c55e;
+}
+
+.end-marker {
+    background-color: #dc2626;
+}
+
+.selected-node {
+    border: 3px solid #ffd700 !important;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.8) !important;
+}
+
+.performance-metrics {
+    font-size: 0.9em;
+}
+
+.comparison-winner {
+    background-color: #d4edda;
+    border-left: 4px solid #28a745;
+    padding: 0.5rem;
+}
+
+.algorithm-result {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.metric-value {
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+}
+
+#mapContainer {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+}
+
+.form-range {
+    width: 100%;
+}
+
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card-header h5, .card-header h6 {
+    margin: 0;
+}
+
+.text-primary { color: #3b82f6 !important; }
+.text-success { color: #22c55e !important; }
+.text-warning { color: #f59e0b !important; }
+.text-danger { color: #ef4444 !important; }
+.text-info { color: #06b6d4 !important; }

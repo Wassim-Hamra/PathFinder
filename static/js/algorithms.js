@@ -25,9 +25,13 @@ class AlgorithmManager {
             });
         }
 
-        // Export button
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            this.exportRoute();
+        // Complexity analysis toggle buttons
+        document.getElementById('showComplexityBtn').addEventListener('click', () => {
+            this.showComplexityAnalysis();
+        });
+
+        document.getElementById('showPerformanceBtn').addEventListener('click', () => {
+            this.showPerformanceMetrics();
         });
     }
 
@@ -97,6 +101,9 @@ class AlgorithmManager {
             window.leafletMap.displayRoute(result);
         }
 
+        // Update performance display with real data
+        this.updatePerformanceDisplay(result);
+
         // Show success message with route details
         this.showRouteDetails(result);
     }
@@ -137,6 +144,9 @@ class AlgorithmManager {
             window.leafletMap.displayComparison(result.dijkstra, result.astar);
         }
 
+        // Update performance display with comparison data
+        this.updateComparisonPerformance(result);
+
         // Show comparison details
         this.showComparisonDetails(result);
     }
@@ -149,12 +159,6 @@ class AlgorithmManager {
             `Distance: ${result.total_distance} km, ` +
             `Duration: ${result.duration_minutes} minutes`
         );
-
-        // Enable export button
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.disabled = false;
-        }
     }
 
     showComparisonDetails(result) {
@@ -169,29 +173,6 @@ class AlgorithmManager {
         message += `<strong>Shorter path:</strong> ${comparison.shorter_path}`;
 
         this.showSuccess(message);
-
-        // Enable export button
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.disabled = false;
-        }
-    }
-
-    exportRoute() {
-        if (!this.currentResults) {
-            this.showError('No route to export');
-            return;
-        }
-
-        const dataStr = JSON.stringify(this.currentResults, null, 2);
-        const dataBlob = new Blob([dataStr], {type: 'application/json'});
-
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(dataBlob);
-        link.download = `route_${new Date().getTime()}.json`;
-        link.click();
-
-        this.showSuccess('Route exported successfully!');
     }
 
     showLoading(show) {
@@ -240,6 +221,88 @@ class AlgorithmManager {
                 }
             }, 5000);
         }
+    }
+
+    showComplexityAnalysis() {
+        // Toggle active state
+        document.getElementById('showComplexityBtn').classList.add('active');
+        document.getElementById('showPerformanceBtn').classList.remove('active');
+
+        // Show complexity display, hide performance
+        document.getElementById('complexityDisplay').style.display = 'block';
+        document.getElementById('performanceDisplay').style.display = 'none';
+
+        // Animate the mini chart bars
+        this.animateMiniChart();
+    }
+
+    showPerformanceMetrics() {
+        // Toggle active state
+        document.getElementById('showPerformanceBtn').classList.add('active');
+        document.getElementById('showComplexityBtn').classList.remove('active');
+
+        // Show performance display, hide complexity
+        document.getElementById('performanceDisplay').style.display = 'block';
+        document.getElementById('complexityDisplay').style.display = 'none';
+    }
+
+    animateMiniChart() {
+        // Add animation classes to mini bars
+        const miniBars = document.querySelectorAll('.mini-bar');
+        miniBars.forEach((bar, index) => {
+            setTimeout(() => {
+                bar.style.transition = 'height 0.8s ease-out';
+            }, index * 100);
+        });
+    }
+
+    updatePerformanceDisplay(result) {
+        // Update performance metrics from route result
+        if (result.performance_analysis) {
+            const analysis = result.performance_analysis.complexity_analysis;
+
+            document.getElementById('lastRouteAlgorithm').textContent = result.algorithm;
+            document.getElementById('lastExecutionTime').textContent = `${analysis.execution_time_ms.toFixed(2)}ms`;
+            document.getElementById('lastNodesExplored').textContent = analysis.nodes_explored;
+            document.getElementById('lastEfficiency').textContent = `${analysis.efficiency_ratio.toFixed(1)}%`;
+
+            // Update insights
+            const insights = analysis.performance_insights;
+            const insightsDiv = document.getElementById('performanceInsights');
+
+            if (insights && insights.length > 0) {
+                let insightsHtml = '';
+                insights.slice(0, 2).forEach(insight => {
+                    insightsHtml += `<div class="insight-item">${insight}</div>`;
+                });
+                insightsDiv.innerHTML = insightsHtml;
+            }
+        }
+    }
+
+    updateComparisonPerformance(result) {
+        // Update performance metrics for comparison
+        const dijkstra = result.dijkstra;
+        const astar = result.astar;
+        const comparison = result.comparison;
+
+        // Show comparison in performance display
+        const insightsDiv = document.getElementById('performanceInsights');
+        insightsDiv.innerHTML = `
+            <div class="insight-item"><strong>Comparison Results:</strong></div>
+            <div class="insight-item">Faster: ${comparison.faster_algorithm}</div>
+            <div class="insight-item">Shorter: ${comparison.shorter_path}</div>
+            <div class="insight-item">Time diff: ${comparison.time_difference.toFixed(2)}ms</div>
+        `;
+
+        // Update metrics with comparison data
+        document.getElementById('lastRouteAlgorithm').textContent = 'Comparison';
+        document.getElementById('lastExecutionTime').textContent = `D:${dijkstra.execution_time.toFixed(1)}ms / A*:${astar.execution_time.toFixed(1)}ms`;
+        document.getElementById('lastNodesExplored').textContent = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
+
+        const dijkstraEff = dijkstra.performance_analysis ? dijkstra.performance_analysis.complexity_analysis.efficiency_ratio : 0;
+        const astarEff = astar.performance_analysis ? astar.performance_analysis.complexity_analysis.efficiency_ratio : 0;
+        document.getElementById('lastEfficiency').textContent = `${dijkstraEff.toFixed(1)}% / ${astarEff.toFixed(1)}%`;
     }
 }
 

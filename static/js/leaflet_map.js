@@ -124,14 +124,26 @@ class LeafletMapComponent {
 
         this.startMarker = L.marker(coords, {
             icon: L.divIcon({
-                className: 'custom-marker start-marker',
+                className: 'custom-marker',
                 html: `
-                    <div class="simple-marker start-marker-circle">
-                        <div class="marker-inner">S</div>
-                    </div>
+                    <div style="
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #22c55e, #16a34a);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 14px;
+                        color: white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        border: 2px solid white;
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                    ">S</div>
                 `,
                 iconSize: [24, 24],
-                iconAnchor: [12, 12], // Center the marker on click position
+                iconAnchor: [12, 12],
                 popupAnchor: [0, -12]
             })
         }).addTo(this.map);
@@ -156,14 +168,26 @@ class LeafletMapComponent {
 
         this.endMarker = L.marker(coords, {
             icon: L.divIcon({
-                className: 'custom-marker end-marker',
+                className: 'custom-marker',
                 html: `
-                    <div class="simple-marker end-marker-circle">
-                        <div class="marker-inner">E</div>
-                    </div>
+                    <div style="
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 50%;
+                        background: linear-gradient(135deg, #dc2626, #b91c1c);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-weight: bold;
+                        font-size: 14px;
+                        color: white;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                        border: 2px solid white;
+                        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+                    ">E</div>
                 `,
                 iconSize: [24, 24],
-                iconAnchor: [12, 12], // Center the marker on click position
+                iconAnchor: [12, 12],
                 popupAnchor: [0, -12]
             })
         }).addTo(this.map);
@@ -526,12 +550,6 @@ class LeafletMapComponent {
         const findBtn = document.getElementById('findPathBtn');
         if (findBtn) {
             findBtn.disabled = !(this.selectedStart && this.selectedEnd);
-        }
-
-        // Enable/disable export button
-        const exportBtn = document.getElementById('exportBtn');
-        if (exportBtn) {
-            exportBtn.disabled = !this.routeLayer;
         }
     }
 

@@ -2,14 +2,23 @@ import heapq
 import time
 from typing import Dict, List, Tuple, Optional
 from .graph_utils import haversine_distance
+from .performance_tracker import PerformanceTracker
 
-def astar_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List[int], int]:
+def astar_pathfinding(graph: Dict, start_node: int, end_node: int, tracker: Optional[PerformanceTracker] = None) -> Tuple[List[int], int, Optional[PerformanceTracker]]:
     """
     A* algorithm implementation for finding shortest path with heuristic
-    Returns: (path, nodes_explored)
+    Returns: (path, nodes_explored, performance_tracker)
     """
+    if tracker is None:
+        tracker = PerformanceTracker()
+
+    tracker.set_algorithm_name("A*")
+    tracker.set_graph_metrics(len(graph), sum(len(node['neighbors']) for node in graph.values()))
+    tracker.start_timing()
+
     def heuristic(node1: int, node2: int) -> float:
         """Calculate heuristic distance between two nodes"""
+        tracker.increment_heuristic_calls()
         coord1 = graph[node1]['coordinates']
         coord2 = graph[node2]['coordinates']
         return haversine_distance(coord1, coord2)
@@ -22,8 +31,13 @@ def astar_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List
     f_score[start_node] = heuristic(start_node, end_node)
     nodes_explored = 0
 
+    # Track memory usage (approximate)
+    tracker.update_memory_usage(len(g_score) + len(f_score) + len(came_from) + len(open_set))
+
     while open_set:
         current_f, current_node = heapq.heappop(open_set)
+        tracker.increment_priority_queue_ops()
+        tracker.increment_nodes_explored()
         nodes_explored += 1
 
         # If we reached the destination
@@ -45,13 +59,19 @@ def astar_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List
                 # Add to open set if not already there
                 if (f_score[neighbor], neighbor) not in open_set:
                     heapq.heappush(open_set, (f_score[neighbor], neighbor))
+                    tracker.increment_priority_queue_ops()
+
+                # Update memory usage tracking
+                tracker.update_memory_usage(len(g_score) + len(f_score) + len(came_from) + len(open_set))
+
+    tracker.stop_timing()
 
     # Reconstruct path
     path = []
     current = end_node
 
     if current not in came_from and current != start_node:
-        return [], nodes_explored  # No path found
+        return [], nodes_explored, tracker  # No path found
 
     while current is not None:
         path.append(current)
@@ -59,4 +79,4 @@ def astar_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List
 
     path.reverse()
 
-    return path, nodes_explored
+    return path, nodes_explored, tracker

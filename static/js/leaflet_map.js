@@ -13,6 +13,8 @@ class LeafletMapComponent {
         this.selectedStart = null;
         this.selectedEnd = null;
         this.isInitialized = false;
+        this.isZooming = false;
+        this.currentAnimation = null;
 
         this.options = {
             defaultZoom: 13,
@@ -58,22 +60,58 @@ class LeafletMapComponent {
 
     setupMapClickHandler() {
         this.map.on('click', (e) => {
+            // Ignore clicks during zoom operations
+            if (this.isZooming) {
+                return;
+            }
+
             const { lat, lng } = e.latlng;
             console.log(`Map clicked at: ${lat}, ${lng}`);
 
-            if (!this.selectedStart) {
-                // Clear any existing routes when starting new selection
-                this.clearRoute();
-                this.setStartPoint([lat, lng]);
-            } else if (!this.selectedEnd) {
-                this.setEndPoint([lat, lng]);
+            // Only process clicks if no route is currently displayed
+            // This prevents accidental clearing during zoom operations
+            if (!this.routeLayer) {
+                if (!this.selectedStart) {
+                    this.setStartPoint([lat, lng]);
+                } else if (!this.selectedEnd) {
+                    this.setEndPoint([lat, lng]);
+                } else {
+                    // If both points are selected but no route, allow reset
+                    this.clearSelection();
+                    this.setStartPoint([lat, lng]);
+                }
             } else {
-                // If both points are selected, reset and start over
-                this.clearSelection();
-                this.setStartPoint([lat, lng]);
+                // If route exists and user deliberately clicks, ask for confirmation
+                // Only clear if click is far from existing markers
+                const startDistance = this.selectedStart ?
+                    this.map.distance(e.latlng, L.latLng(this.selectedStart[0], this.selectedStart[1])) : Infinity;
+                const endDistance = this.selectedEnd ?
+                    this.map.distance(e.latlng, L.latLng(this.selectedEnd[0], this.selectedEnd[1])) : Infinity;
+
+                // Only reset if click is more than 100 meters from existing markers
+                if (startDistance > 100 && endDistance > 100) {
+                    // Show confirmation before clearing
+                    if (confirm('Clear current route and set new start point?')) {
+                        this.clearSelection();
+                        this.setStartPoint([lat, lng]);
+                    }
+                }
             }
 
             this.updateUI();
+        });
+
+        // Add zoom event handlers to prevent route clearing during zoom
+        this.map.on('zoomstart', () => {
+            // Disable click handling during zoom
+            this.isZooming = true;
+        });
+
+        this.map.on('zoomend', () => {
+            // Re-enable click handling after zoom
+            setTimeout(() => {
+                this.isZooming = false;
+            }, 100);
         });
     }
 
@@ -223,33 +261,36 @@ class LeafletMapComponent {
     }
 
     animateRoute(coordinates, polyline) {
-        let currentIndex = 0;
-        const animationSpeed = 20; // milliseconds between points
-        const coordinatesPerFrame = 2; // Add multiple points per frame for smoother animation
+        // Clear any existing animations
+        if (this.currentAnimation) {
+            clearTimeout(this.currentAnimation);
+        }
 
-        // Set initial opacity
-        polyline.setStyle({ opacity: 0.8 });
+        let currentIndex = 0;
+        const animationSpeed = 30; // Consistent timing
+        const coordinatesPerFrame = 1; // Smoother, one point at a time
+
+        // Set initial state
+        polyline.setStyle({
+            opacity: 0.8,
+            weight: 4
+        });
 
         const animate = () => {
             if (currentIndex < coordinates.length) {
-                // Add next batch of coordinates
-                const endIndex = Math.min(currentIndex + coordinatesPerFrame, coordinates.length);
-                const newCoords = coordinates.slice(0, endIndex);
-
+                // Add next coordinate
+                const newCoords = coordinates.slice(0, currentIndex + 1);
                 polyline.setLatLngs(newCoords);
 
-                currentIndex = endIndex;
-                setTimeout(animate, animationSpeed);
+                currentIndex++;
+                this.currentAnimation = setTimeout(animate, animationSpeed);
             } else {
-                // Animation complete - add final styling
+                // Animation complete - simple completion effect
                 polyline.setStyle({
                     opacity: 0.9,
-                    weight: 6,
-                    className: 'route-complete'
+                    weight: 5
                 });
-
-                // Add route completion effect
-                this.addRouteCompletionEffect(polyline);
+                this.currentAnimation = null;
             }
         };
 
@@ -257,24 +298,14 @@ class LeafletMapComponent {
     }
 
     addRouteCompletionEffect(polyline) {
-        // Add a temporary glow effect when route is complete
-        const originalStyle = {
-            color: polyline.options.color,
-            weight: polyline.options.weight,
-            opacity: polyline.options.opacity
-        };
+        // Simplified completion effect - just a subtle weight increase
+        const originalWeight = polyline.options.weight;
 
-        // Glow effect
-        polyline.setStyle({
-            color: '#ffdd00',
-            weight: 8,
-            opacity: 1
-        });
+        polyline.setStyle({ weight: originalWeight + 2 });
 
-        // Return to original style after glow
         setTimeout(() => {
-            polyline.setStyle(originalStyle);
-        }, 800);
+            polyline.setStyle({ weight: originalWeight });
+        }, 500);
     }
 
     displayComparison(dijkstraResult, astarResult) {

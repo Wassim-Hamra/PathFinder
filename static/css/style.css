@@ -68,6 +68,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Removed translateY transform to position pin exactly at click */
 }
 
 .start-pin {
@@ -75,7 +76,7 @@ body {
     clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
     border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
     box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
-    animation: pinDrop 0.6s ease-out;
+    animation: pinDrop 0.4s ease-out;
 }
 
 .end-pin {
@@ -83,7 +84,7 @@ body {
     clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
     border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
     box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
-    animation: pinDrop 0.6s ease-out;
+    animation: pinDrop 0.4s ease-out;
 }
 
 .marker-icon {
@@ -102,7 +103,7 @@ body {
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    animation: pulse 2s infinite;
+    animation: pulse 1.5s infinite; /* Faster pulse */
 }
 
 .start-pulse {
@@ -116,12 +117,12 @@ body {
 /* Pin Drop Animation */
 @keyframes pinDrop {
     0% {
-        transform: translateY(-50px) scale(0.5);
+        transform: translateY(-50px) scale(0.3);
         opacity: 0;
     }
-    50% {
+    60% {
         transform: translateY(5px) scale(1.1);
-        opacity: 0.8;
+        opacity: 0.9;
     }
     100% {
         transform: translateY(0) scale(1);
@@ -136,11 +137,11 @@ body {
         opacity: 1;
     }
     50% {
-        transform: scale(1.5);
-        opacity: 0.3;
+        transform: scale(1.8);
+        opacity: 0.2;
     }
     100% {
-        transform: scale(2);
+        transform: scale(2.2);
         opacity: 0;
     }
 }
@@ -259,6 +260,53 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Car marker styles */
+.car-marker {
+    background: none !important;
+    border: none !important;
+}
+
+.car-container {
+    position: relative;
+    transition: transform 0.05s ease-out; /* Faster, smoother rotation */
+    transform-origin: center center;
+}
+
+.car-shadow {
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20px;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 50%;
+    filter: blur(2px);
+}
+
+/* Car bounce animation for completion */
+@keyframes carBounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    25% { transform: translateY(-8px) scale(1.15); }
+    50% { transform: translateY(-12px) scale(1.2); }
+    75% { transform: translateY(-4px) scale(1.1); }
+}
+
+/* Enhanced marker positioning */
+.custom-marker {
+    background: none;
+    border: none;
+}
+
+.custom-marker div {
+    position: relative;
+}
+
+/* Car marker specific z-index */
+.car-marker {
+    z-index: 1000 !important;
 }
 
 /* Responsive Design */

@@ -113,8 +113,12 @@ class PerformanceTracker:
                 }
             }
         else:
+            # Unknown algorithm fallback
             analysis = {
                 "algorithm": "Unknown Algorithm",
+                "theoretical_complexity": "N/A",
+                "nodes_explored": self.nodes_explored,
+                "efficiency_ratio": (self.nodes_explored / V * 100) if V > 0 else 0,
                 "error": "Algorithm not recognized for complexity analysis"
             }
 

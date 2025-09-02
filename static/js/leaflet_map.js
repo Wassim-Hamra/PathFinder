@@ -415,17 +415,44 @@ class LeafletMapComponent {
     }
 
     addCarCompletionEffect(carMarker) {
-        // Add a bounce effect when car reaches destination
+        // Add a smooth bounce effect when car reaches destination
         const icon = carMarker.getElement();
         if (icon) {
-            icon.style.animation = 'carBounce 0.6s ease-in-out';
+            // Stop any ongoing rotation animations first
+            const carContainer = icon.querySelector('.car-container-3d') || icon.querySelector('.car-container');
+            if (carContainer) {
+                carContainer.style.transition = 'transform 0.3s ease-out';
+            }
 
-            // Remove animation class after completion
+            // Add bounce animation
+            icon.style.animation = 'carBounce 0.6s ease-in-out';
+            icon.style.animationFillMode = 'forwards';
+
+            // Clean up animation and stabilize the car
             setTimeout(() => {
-                if (icon) {
+                if (icon && icon.parentNode) {
                     icon.style.animation = '';
+                    icon.style.animationFillMode = '';
+                    // Reset transform to prevent glitching
+                    if (carContainer) {
+                        carContainer.style.transition = '';
+                        carContainer.style.transform = 'rotate(0deg) scale(1)';
+                    }
                 }
             }, 600);
+
+            // Add a subtle final pulse effect
+            setTimeout(() => {
+                if (icon && icon.parentNode) {
+                    icon.style.transform = 'scale(1.1)';
+                    setTimeout(() => {
+                        if (icon && icon.parentNode) {
+                            icon.style.transform = 'scale(1)';
+                            icon.style.transition = 'transform 0.2s ease-out';
+                        }
+                    }, 200);
+                }
+            }, 700);
         }
     }
 

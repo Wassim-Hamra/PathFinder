@@ -300,19 +300,41 @@ class AlgorithmManager {
         document.getElementById('lastExecutionTime').textContent = `D:${dijkstra.execution_time.toFixed(1)}ms / A*:${astar.execution_time.toFixed(1)}ms`;
         document.getElementById('lastNodesExplored').textContent = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
 
-        const dijkstraEff = dijkstra.performance_analysis ? dijkstra.performance_analysis.complexity_analysis.efficiency_ratio : 0;
-        const astarEff = astar.performance_analysis ? astar.performance_analysis.complexity_analysis.efficiency_ratio : 0;
-        document.getElementById('lastEfficiency').textContent = `${dijkstraEff.toFixed(1)}% / ${astarEff.toFixed(1)}%`;
+        // Calculate efficiency ratios
+        const dijkstraEfficiency = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
+        const astarEfficiency = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
+        document.getElementById('lastEfficiency').textContent = `${dijkstraEfficiency.toFixed(1)}% / ${astarEfficiency.toFixed(1)}%`;
+    }
+
+    updateComplexityVisualization(result) {
+        // Update the mini chart with actual performance data
+        if (result.performance_analysis) {
+            const analysis = result.performance_analysis.complexity_analysis;
+
+            // Update algorithm-specific bars based on actual performance
+            const algorithm = result.algorithm.toLowerCase();
+            const efficiencyRatio = analysis.efficiency_ratio || 0;
+
+            // Animate bars based on efficiency (lower is better for exploration)
+            const barHeight = Math.max(10, 100 - efficiencyRatio); // Invert for visualization
+
+            if (algorithm === 'dijkstra') {
+                document.querySelectorAll('.dijkstra-mini').forEach(bar => {
+                    bar.style.height = `${barHeight}%`;
+                });
+            } else if (algorithm === 'astar') {
+                document.querySelectorAll('.astar-mini').forEach(bar => {
+                    bar.style.height = `${barHeight}%`;
+                });
+            }
+        }
     }
 }
 
 // Initialize algorithm manager when DOM is loaded
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('Initializing Algorithm Manager...');
+document.addEventListener('DOMContentLoaded', () => {
+    window.algorithmManager = new AlgorithmManager();
 
-    // Wait for map to be ready
-    setTimeout(() => {
-        window.algorithmManager = new AlgorithmManager();
-        console.log('Algorithm Manager initialized');
-    }, 200);
+    // Set default display to complexity analysis
+    document.getElementById('showComplexityBtn').click();
 });

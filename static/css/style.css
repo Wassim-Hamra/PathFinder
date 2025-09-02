@@ -6,7 +6,7 @@ body {
     padding: 0;
     height: 100vh;
     overflow: hidden;
-    padding-bottom: 50px; /* Reduced from 80px for smaller footer */
+    padding-bottom: 40px; /* Match footer height */
 }
 
 .container-fluid {
@@ -21,7 +21,7 @@ body {
 
 /* Map Styles */
 #map {
-    height: calc(100vh - 50px) !important; /* Reduced from 80px for smaller footer */
+    height: calc(100vh - 40px) !important; /* Match footer height */
     width: 100% !important;
     z-index: 1;
 }
@@ -535,33 +535,33 @@ body {
     left: 0;
     right: 0;
     z-index: 1001;
-    background: #212529 !important; /* Solid dark background instead of semi-transparent */
+    background: #212529 !important;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 8px 0 !important; /* Reduced padding from default Bootstrap py-3 */
-    min-height: 50px; /* Set explicit height */
+    padding: 6px 0 !important;
+    height: 40px !important; /* Reduced height */
 }
 
 .footer .container-fluid {
-    height: auto; /* Override the 100vh height for footer container */
+    height: auto;
 }
 
 .footer p,
-.footer p * {
-    margin-bottom: 0.25rem !important; /* Reduced margin between footer lines */
-    font-size: 0.8rem !important; /* Slightly smaller font size */
-    color: #ffffff !important; /* Ensure white text */
-}
-
+.footer p *,
 .footer small,
-.footer small * {
-    font-size: 0.75rem !important; /* Even smaller for copyright text */
-    color: #ffffff !important; /* Ensure white text */
+.footer small *,
+.footer span,
+.footer a {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 0.7rem !important; /* Smaller text */
+    color: #ffffff !important;
+    line-height: 1.2 !important;
 }
 
 .footer a,
 .footer a.text-info,
 .footer .text-info {
-    color: #17a2b8 !important; /* Info color for links */
+    color: #17a2b8 !important;
     text-decoration: none !important;
     transition: color 0.2s ease !important;
 }
@@ -574,24 +574,22 @@ body {
 }
 
 .footer .fab.fa-linkedin {
-    margin-right: 5px;
+    margin-right: 3px;
     color: #17a2b8 !important;
+    font-size: 0.7rem !important;
 }
 
-.footer .text-muted,
-.footer .text-muted * {
-    color: #adb5bd !important; /* Light gray for muted text in footer */
+/* Ensure footer content is centered and visible */
+.footer .row,
+.footer .col-12 {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
 }
 
-/* Additional specificity for footer text visibility */
-footer.footer p small,
-footer.footer small,
-footer.footer p,
-footer.bg-dark p,
-footer.bg-dark small {
-    color: #ffffff !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+.footer .col-12 p {
+    display: inline-block;
+    margin: 0 10px !important;
 }
 
 /* Analytics and Complexity Visualization Styles */

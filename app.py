@@ -180,11 +180,11 @@ def find_route():
                 'dijkstra': dijkstra_result,
                 'astar': astar_result,
                 'comparison': {
-                    'distance_difference': abs(dijkstra_result['total_distance'] - astar_result['total_distance']),
-                    'time_difference': abs(dijkstra_result['execution_time'] - astar_result['execution_time']),
-                    'nodes_difference': abs(dijkstra_result['nodes_explored'] - astar_result['nodes_explored']),
-                    'faster_algorithm': 'A*' if astar_result['execution_time'] < dijkstra_result['execution_time'] else 'Dijkstra',
-                    'shorter_path': 'A*' if astar_result['total_distance'] < dijkstra_result['total_distance'] else 'Dijkstra'
+                    'distance_difference': abs(float(dijkstra_result['total_distance']) - float(astar_result['total_distance'])),
+                    'time_difference': abs(float(dijkstra_result['execution_time']) - float(astar_result['execution_time'])),
+                    'nodes_difference': abs(int(dijkstra_result['nodes_explored']) - int(astar_result['nodes_explored'])),
+                    'faster_algorithm': 'A*' if float(astar_result['execution_time']) < float(dijkstra_result['execution_time']) else 'Dijkstra',
+                    'shorter_path': 'A*' if float(astar_result['total_distance']) < float(dijkstra_result['total_distance']) else 'Dijkstra'
                 }
             })
         else:
@@ -246,14 +246,14 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
 
         # Connect consecutive nodes (this maintains street following)
         for i in range(len(sampled_route) - 1):
-            distance = haversine_distance(sampled_route[i], sampled_route[i + 1])
+            distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 1]))
             graph[i]['neighbors'].append({'node': i + 1, 'weight': distance})
             graph[i + 1]['neighbors'].append({'node': i, 'weight': distance})
 
         # Add some skip connections for algorithm differentiation
         for i in range(len(sampled_route) - 3):
             if i % 3 == 0:  # Every 3rd node, add a skip connection
-                skip_distance = haversine_distance(sampled_route[i], sampled_route[i + 2])
+                skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 2]))
                 penalty_factor = 1.2 if algorithm == 'dijkstra' else 1.1
 
                 graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
@@ -305,7 +305,7 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
             'execution_time_ms': complexity_analysis.get('execution_time_ms', 0),
             'nodes_explored': tracker.nodes_explored,
             'graph_size': tracker.graph_size,
-            'efficiency_ratio': complexity_analysis.get('efficiency_ratio', 0),
+            'efficiency_ratio': complexity_analysis.get('efficiency_ratio', 0) if complexity_analysis.get('efficiency_ratio') is not None else 0,
             'timestamp': time.time()
         }
         performance_history.append(performance_data)

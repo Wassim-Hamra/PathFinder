@@ -83,7 +83,7 @@ class LeafletMapComponent {
                     this.setStartPoint([lat, lng]);
                 }
             } else {
-                // If route exists and user deliberately clicks, ask for confirmation
+                // If route exists and user deliberately clicks, allow clearing
                 // Only clear if click is far from existing markers
                 const startDistance = this.selectedStart ?
                     this.map.distance(e.latlng, L.latLng(this.selectedStart[0], this.selectedStart[1])) : Infinity;
@@ -92,11 +92,9 @@ class LeafletMapComponent {
 
                 // Only reset if click is more than 100 meters from existing markers
                 if (startDistance > 100 && endDistance > 100) {
-                    // Show confirmation before clearing
-                    if (confirm('Clear current route and set new start point?')) {
-                        this.clearSelection();
-                        this.setStartPoint([lat, lng]);
-                    }
+                    // Clear and set new start point without confirmation
+                    this.clearSelection();
+                    this.setStartPoint([lat, lng]);
                 }
             }
 
@@ -334,21 +332,35 @@ class LeafletMapComponent {
         this.carMarkers.push(carMarker);
 
         let currentIndex = 0;
-        const carSpeed = 25; // Faster car movement (was 50ms)
+        let progress = 0; // Track progress between points
+        const carSpeed = 5; // Much faster timing (was 8ms)
+        const progressStep = 0.3; // Larger steps for faster movement (was 0.2)
 
         const animateCar = () => {
             if (currentIndex < coordinates.length - 1) {
                 const currentPos = coordinates[currentIndex];
                 const nextPos = coordinates[currentIndex + 1];
 
+                // Interpolate between current and next position
+                const lat = currentPos[0] + (nextPos[0] - currentPos[0]) * progress;
+                const lng = currentPos[1] + (nextPos[1] - currentPos[1]) * progress;
+
                 // Calculate bearing for car rotation
                 const bearing = this.calculateBearing(currentPos, nextPos);
 
                 // Update car position and rotation
-                carMarker.setLatLng(nextPos);
+                carMarker.setLatLng([lat, lng]);
                 this.rotateCarIcon(carMarker, bearing);
 
-                currentIndex++;
+                // Advance progress
+                progress += progressStep;
+
+                // Move to next segment when current one is complete
+                if (progress >= 1) {
+                    progress = 0;
+                    currentIndex++;
+                }
+
                 const timeout = setTimeout(animateCar, carSpeed);
                 this.carAnimations.push(timeout);
             } else {

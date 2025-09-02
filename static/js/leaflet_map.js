@@ -1,6 +1,6 @@
 /**
  * Interactive Leaflet Map Component for Real Street Route Visualization
- * Uses direct OSRM API for reliable street routing
+ * Uses OSRM API for reliable street routing
  */
 
 class LeafletMapComponent {
@@ -53,82 +53,104 @@ class LeafletMapComponent {
             maxZoom: 19
         }).addTo(this.map);
 
-        // Initialize route layer
-        this.routeLayer = L.layerGroup().addTo(this.map);
-
-        // Add map resize handler
-        setTimeout(() => {
-            this.map.invalidateSize();
-        }, 100);
+        console.log('Map created successfully');
     }
 
     setupMapClickHandler() {
-        if (!this.map) return;
-
         this.map.on('click', (e) => {
             const { lat, lng } = e.latlng;
-            this.selectPoint([lat, lng]);
+            console.log(`Map clicked at: ${lat}, ${lng}`);
+
+            if (!this.selectedStart) {
+                // Clear any existing routes when starting new selection
+                this.clearRoute();
+                this.setStartPoint([lat, lng]);
+            } else if (!this.selectedEnd) {
+                this.setEndPoint([lat, lng]);
+            } else {
+                // If both points are selected, reset and start over
+                this.clearSelection();
+                this.setStartPoint([lat, lng]);
+            }
+
+            this.updateUI();
         });
     }
 
-    selectPoint(coords) {
-        if (!this.selectedStart) {
-            // Set start point
-            this.selectedStart = coords;
-            this.addStartMarker(coords);
-            this.showInfo('Start point selected. Click another location to set the end point.');
-        } else if (!this.selectedEnd) {
-            // Set end point
-            this.selectedEnd = coords;
-            this.addEndMarker(coords);
-            this.showInfo('End point selected. Click "Find Route" to calculate the route.');
-            this.enableFindButton();
-        } else {
-            // Reset and set new start point
-            this.clearSelection();
-            this.selectedStart = coords;
-            this.addStartMarker(coords);
-            this.showInfo('Start point reset. Click another location to set the end point.');
-        }
+    setStartPoint(coords) {
+        this.selectedStart = coords;
 
-        // Update selection status in UI
-        if (window.updateSelectionStatus) {
-            window.updateSelectionStatus();
-        }
-    }
-
-    addStartMarker(coords) {
         if (this.startMarker) {
             this.map.removeLayer(this.startMarker);
         }
 
         this.startMarker = L.marker(coords, {
             icon: L.divIcon({
-                html: '<div style="background-color: #22c55e; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
-                className: 'custom-marker',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
+                className: 'custom-marker start-marker',
+                html: `
+                    <div class="marker-pin start-pin">
+                        <div class="marker-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <path d="m9 12 2 2 4-4"/>
+                            </svg>
+                        </div>
+                        <div class="marker-pulse start-pulse"></div>
+                    </div>
+                `,
+                iconSize: [40, 50],
+                iconAnchor: [20, 50],
+                popupAnchor: [0, -50]
             })
         }).addTo(this.map);
 
-        this.startMarker.bindPopup('<b>Start Point</b>').openPopup();
+        // Add popup
+        this.startMarker.bindPopup(
+            `<div class="marker-popup start-popup">
+                <strong>🚀 Start Point</strong><br>
+                <small>${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}</small>
+            </div>`
+        );
+
+        console.log('Start point set:', coords);
     }
 
-    addEndMarker(coords) {
+    setEndPoint(coords) {
+        this.selectedEnd = coords;
+
         if (this.endMarker) {
             this.map.removeLayer(this.endMarker);
         }
 
         this.endMarker = L.marker(coords, {
             icon: L.divIcon({
-                html: '<div style="background-color: #dc2626; width: 20px; height: 20px; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"></div>',
-                className: 'custom-marker',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
+                className: 'custom-marker end-marker',
+                html: `
+                    <div class="marker-pin end-pin">
+                        <div class="marker-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                                <circle cx="12" cy="10" r="3"/>
+                            </svg>
+                        </div>
+                        <div class="marker-pulse end-pulse"></div>
+                    </div>
+                `,
+                iconSize: [40, 50],
+                iconAnchor: [20, 50],
+                popupAnchor: [0, -50]
             })
         }).addTo(this.map);
 
-        this.endMarker.bindPopup('<b>End Point</b>').openPopup();
+        // Add popup
+        this.endMarker.bindPopup(
+            `<div class="marker-popup end-popup">
+                <strong>🎯 Destination</strong><br>
+                <small>${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}</small>
+            </div>`
+        );
+
+        console.log('End point set:', coords);
     }
 
     clearSelection() {
@@ -146,212 +168,259 @@ class LeafletMapComponent {
         }
 
         this.clearRoute();
-        this.disableFindButton();
-
-        // Update selection status in UI
-        if (window.updateSelectionStatus) {
-            window.updateSelectionStatus();
-        }
+        console.log('Selection cleared');
     }
 
     clearRoute() {
+        // Clear main route layer
         if (this.routeLayer) {
-            this.routeLayer.clearLayers();
-        }
-    }
-
-    async findRoute(algorithm = 'fastest') {
-        if (!this.selectedStart || !this.selectedEnd) {
-            throw new Error('Start and end points must be selected');
+            this.map.removeLayer(this.routeLayer);
+            this.routeLayer = null;
         }
 
-        const start = this.selectedStart;
-        const end = this.selectedEnd;
-
-        // Determine routing profile
-        const profile = algorithm === 'shortest' ? 'foot' : 'driving';
-
-        try {
-            // Use OSRM API directly for real street routing
-            const osrmUrl = `https://router.project-osrm.org/route/v1/${profile}/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson`;
-
-            console.log('Calling OSRM API:', osrmUrl);
-
-            const response = await fetch(osrmUrl, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
-                }
-            });
-
-            if (!response.ok) {
-                throw new Error(`OSRM API returned ${response.status}: ${response.statusText}`);
+        // Clear any comparison route layers
+        this.map.eachLayer((layer) => {
+            if (layer instanceof L.Polyline && layer !== this.routeLayer) {
+                // Remove any polyline that's not the main route (comparison routes)
+                this.map.removeLayer(layer);
             }
+        });
 
-            const data = await response.json();
-            console.log('OSRM Response:', data);
-
-            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                const coordinates = route.geometry.coordinates.map(coord => [coord[1], coord[0]]); // Convert [lng,lat] to [lat,lng]
-
-                console.log(`Route found: ${coordinates.length} waypoints, ${route.distance}m, ${route.duration}s`);
-
-                // Create route data object
-                const routeData = {
-                    coordinates: coordinates,
-                    distance: route.distance,
-                    duration: route.duration,
-                    algorithm: algorithm
-                };
-
-                // Display the route on the map
-                this.displayStreetRoute(routeData);
-
-                return {
-                    algorithm: algorithm,
-                    distance: route.distance,
-                    duration: route.duration,
-                    coordinates: coordinates,
-                    service: 'OSRM (Real Streets)'
-                };
-            } else {
-                console.error('OSRM returned no valid routes:', data);
-                throw new Error(`No route found: ${data.message || 'Unknown error'}`);
-            }
-        } catch (error) {
-            console.error('OSRM routing failed:', error);
-
-            // Fallback to simple demonstration route for testing
-            console.log('Falling back to demo route for testing...');
-            return this.createFallbackRoute(start, end, algorithm);
-        }
-    }
-
-    createFallbackRoute(start, end, algorithm) {
-        // Create a simple route for testing when OSRM fails
-        const waypoints = [start];
-
-        // Add some intermediate points to simulate a street route
-        const steps = 5;
-        for (let i = 1; i < steps; i++) {
-            const progress = i / steps;
-            const lat = start[0] + (end[0] - start[0]) * progress;
-            const lng = start[1] + (end[1] - start[1]) * progress;
-            waypoints.push([lat, lng]);
-        }
-
-        waypoints.push(end);
-
-        // Calculate approximate distance
-        let totalDistance = 0;
-        for (let i = 0; i < waypoints.length - 1; i++) {
-            totalDistance += this.calculateDistance(waypoints[i], waypoints[i + 1]);
-        }
-
-        const routeData = {
-            coordinates: waypoints,
-            distance: totalDistance * 1000, // Convert to meters
-            duration: (totalDistance / 30) * 3600, // Assume 30 km/h average speed
-            algorithm: algorithm
-        };
-
-        this.displayStreetRoute(routeData);
-
-        return {
-            algorithm: algorithm,
-            distance: routeData.distance,
-            duration: routeData.duration,
-            coordinates: waypoints,
-            service: 'Fallback Demo',
-            note: 'OSRM API unavailable, showing demo route'
-        };
-    }
-
-    calculateDistance(coord1, coord2) {
-        // Haversine formula for distance calculation
-        const lat1 = coord1[0] * Math.PI / 180;
-        const lon1 = coord1[1] * Math.PI / 180;
-        const lat2 = coord2[0] * Math.PI / 180;
-        const lon2 = coord2[1] * Math.PI / 180;
-
-        const dlat = lat2 - lat1;
-        const dlon = lon2 - lon1;
-
-        const a = Math.sin(dlat/2) * Math.sin(dlat/2) +
-                  Math.cos(lat1) * Math.cos(lat2) *
-                  Math.sin(dlon/2) * Math.sin(dlon/2);
-
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        const R = 6371; // Earth's radius in km
-
-        return R * c;
+        console.log('All routes cleared from map');
     }
 
     displayRoute(routeData) {
-        // Alias for displayStreetRoute to maintain compatibility
-        return this.displayStreetRoute(routeData);
-    }
+        console.log('Displaying route:', routeData);
 
-    displayStreetRoute(routeData) {
-        // Clear any existing route
         this.clearRoute();
 
-        // Draw the route line
-        const routeLine = L.polyline(routeData.coordinates, {
+        if (!routeData.coordinates || routeData.coordinates.length === 0) {
+            console.error('No route coordinates provided');
+            return;
+        }
+
+        // Create animated route line
+        this.routeLayer = L.polyline([], {
             color: this.colors.route,
-            weight: 4,
-            opacity: 0.8
-        }).addTo(this.routeLayer);
+            weight: 6,
+            opacity: 0,
+            smoothFactor: 1,
+            className: 'animated-route'
+        }).addTo(this.map);
 
-        // Fit map to show the route
-        const group = new L.featureGroup([routeLine]);
-        if (this.startMarker) group.addLayer(this.startMarker);
-        if (this.endMarker) group.addLayer(this.endMarker);
+        // Animate the route drawing
+        this.animateRoute(routeData.coordinates, this.routeLayer);
 
-        this.map.fitBounds(group.getBounds().pad(0.1));
+        // Fit map to show the entire route after animation starts
+        setTimeout(() => {
+            const group = new L.featureGroup([this.routeLayer]);
+            if (this.startMarker) group.addLayer(this.startMarker);
+            if (this.endMarker) group.addLayer(this.endMarker);
+            this.map.fitBounds(group.getBounds().pad(0.1));
+        }, 100);
 
-        console.log('Street route displayed successfully');
+        console.log('Route displayed successfully');
     }
 
-    enableFindButton() {
-        const findBtn = document.getElementById('findPathBtn');
-        if (findBtn) {
-            findBtn.disabled = false;
+    animateRoute(coordinates, polyline) {
+        let currentIndex = 0;
+        const animationSpeed = 20; // milliseconds between points
+        const coordinatesPerFrame = 2; // Add multiple points per frame for smoother animation
+
+        // Set initial opacity
+        polyline.setStyle({ opacity: 0.8 });
+
+        const animate = () => {
+            if (currentIndex < coordinates.length) {
+                // Add next batch of coordinates
+                const endIndex = Math.min(currentIndex + coordinatesPerFrame, coordinates.length);
+                const newCoords = coordinates.slice(0, endIndex);
+
+                polyline.setLatLngs(newCoords);
+
+                currentIndex = endIndex;
+                setTimeout(animate, animationSpeed);
+            } else {
+                // Animation complete - add final styling
+                polyline.setStyle({
+                    opacity: 0.9,
+                    weight: 6,
+                    className: 'route-complete'
+                });
+
+                // Add route completion effect
+                this.addRouteCompletionEffect(polyline);
+            }
+        };
+
+        animate();
+    }
+
+    addRouteCompletionEffect(polyline) {
+        // Add a temporary glow effect when route is complete
+        const originalStyle = {
+            color: polyline.options.color,
+            weight: polyline.options.weight,
+            opacity: polyline.options.opacity
+        };
+
+        // Glow effect
+        polyline.setStyle({
+            color: '#ffdd00',
+            weight: 8,
+            opacity: 1
+        });
+
+        // Return to original style after glow
+        setTimeout(() => {
+            polyline.setStyle(originalStyle);
+        }, 800);
+    }
+
+    displayComparison(dijkstraResult, astarResult) {
+        console.log('Displaying route comparison');
+
+        this.clearRoute();
+
+        // Display Dijkstra route first
+        if (dijkstraResult.coordinates && dijkstraResult.coordinates.length > 0) {
+            const dijkstraLayer = L.polyline([], {
+                color: '#3b82f6',
+                weight: 5,
+                opacity: 0,
+                dashArray: '10, 5',
+                className: 'dijkstra-route'
+            }).addTo(this.map);
+            dijkstraLayer.bindPopup(`
+                <div class="route-popup dijkstra-popup">
+                    <strong>🔵 Dijkstra Algorithm</strong><br>
+                    Distance: ${dijkstraResult.total_distance}km<br>
+                    Duration: ${dijkstraResult.duration_minutes}min<br>
+                    Nodes Explored: ${dijkstraResult.nodes_explored}
+                </div>
+            `);
+
+            // Animate Dijkstra route
+            this.animateComparisonRoute(dijkstraResult.coordinates, dijkstraLayer, 0);
         }
-    }
 
-    disableFindButton() {
-        const findBtn = document.getElementById('findPathBtn');
-        if (findBtn) {
-            findBtn.disabled = true;
-        }
-    }
-
-    showInfo(message) {
-        console.log('Info:', message);
-
-        // Show toast instead of popup to avoid interfering with map
-        if (window.algorithmManager) {
-            window.algorithmManager.showToast(message, 'info');
-        }
-    }
-
-    resize() {
-        if (this.map) {
+        // Display A* route with delay
+        if (astarResult.coordinates && astarResult.coordinates.length > 0) {
             setTimeout(() => {
-                this.map.invalidateSize();
-            }, 100);
+                const astarLayer = L.polyline([], {
+                    color: '#dc2626',
+                    weight: 5,
+                    opacity: 0,
+                    dashArray: '5, 10',
+                    className: 'astar-route'
+                }).addTo(this.map);
+                astarLayer.bindPopup(`
+                    <div class="route-popup astar-popup">
+                        <strong>🔴 A* Algorithm</strong><br>
+                        Distance: ${astarResult.total_distance}km<br>
+                        Duration: ${astarResult.duration_minutes}min<br>
+                        Nodes Explored: ${astarResult.nodes_explored}
+                    </div>
+                `);
+
+                // Animate A* route
+                this.animateComparisonRoute(astarResult.coordinates, astarLayer, 0);
+            }, 1000); // Delay A* animation by 1 second
+        }
+
+        console.log('Comparison routes displayed');
+    }
+
+    animateComparisonRoute(coordinates, polyline, delay = 0) {
+        setTimeout(() => {
+            let currentIndex = 0;
+            const animationSpeed = 15; // Faster for comparison
+            const coordinatesPerFrame = 3;
+
+            polyline.setStyle({ opacity: 0.8 });
+
+            const animate = () => {
+                if (currentIndex < coordinates.length) {
+                    const endIndex = Math.min(currentIndex + coordinatesPerFrame, coordinates.length);
+                    const newCoords = coordinates.slice(0, endIndex);
+
+                    polyline.setLatLngs(newCoords);
+                    currentIndex = endIndex;
+                    setTimeout(animate, animationSpeed);
+                } else {
+                    // Animation complete
+                    polyline.setStyle({ opacity: 0.9 });
+                }
+            };
+
+            animate();
+        }, delay);
+    }
+
+    updateUI() {
+        // Update status display
+        const statusDiv = document.getElementById('selectionStatus');
+        if (statusDiv) {
+            let statusText = '';
+            if (this.selectedStart) {
+                statusText += `<span class="text-success">✓ Start: ${this.selectedStart[0].toFixed(4)}, ${this.selectedStart[1].toFixed(4)}</span><br>`;
+            } else {
+                statusText += '<span class="text-muted">○ Click map to set start point</span><br>';
+            }
+
+            if (this.selectedEnd) {
+                statusText += `<span class="text-danger">✓ End: ${this.selectedEnd[0].toFixed(4)}, ${this.selectedEnd[1].toFixed(4)}</span>`;
+            } else {
+                statusText += '<span class="text-muted">○ Click map to set end point</span>';
+            }
+
+            statusDiv.innerHTML = statusText;
+        }
+
+        // Enable/disable find route button
+        const findBtn = document.getElementById('findPathBtn');
+        if (findBtn) {
+            findBtn.disabled = !(this.selectedStart && this.selectedEnd);
+        }
+
+        // Enable/disable export button
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.disabled = !this.routeLayer;
         }
     }
 
-    destroy() {
-        if (this.map) {
-            this.map.remove();
-            this.map = null;
-        }
+    getSelectedPoints() {
+        return {
+            start: this.selectedStart,
+            end: this.selectedEnd
+        };
+    }
+
+    hasValidSelection() {
+        return this.selectedStart && this.selectedEnd;
     }
 }
 
-// Export for global use
-window.LeafletMapComponent = LeafletMapComponent;
+// Global map instance
+let leafletMap;
+
+// Initialize map when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded, initializing map...');
+
+    // Wait a bit to ensure all dependencies are loaded
+    setTimeout(() => {
+        leafletMap = new LeafletMapComponent('map', {
+            center: [40.7128, -74.0060], // NYC
+            defaultZoom: 13
+        });
+
+        leafletMap.init();
+
+        // Make it globally accessible
+        window.leafletMap = leafletMap;
+
+        console.log('Map setup complete');
+    }, 100);
+});

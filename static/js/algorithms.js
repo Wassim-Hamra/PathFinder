@@ -18,7 +18,10 @@ class AlgorithmManager {
         const clearBtn = document.getElementById('clearSelectionBtn');
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
-                window.leafletMap.clearSelection();
+                if (window.leafletMap) {
+                    window.leafletMap.clearSelection();
+                    window.leafletMap.updateUI();
+                }
             });
         }
 
@@ -59,177 +62,119 @@ class AlgorithmManager {
     }
 
     async findSingleRoute(algorithm) {
-        try {
-            // Call the map's findRoute method which uses real OSRM street routing
-            const result = await window.leafletMap.findRoute(algorithm);
+        const requestData = {
+            start: window.leafletMap.selectedStart,
+            end: window.leafletMap.selectedEnd,
+            algorithm: algorithm,
+            use_real_streets: true
+        };
 
-            // Add execution time
-            result.execution_time = 50.0; // OSRM is very fast
+        console.log('Finding route with:', requestData);
 
-            this.currentResults = result;
-            this.displaySingleResult(result);
-            this.storeTestResult(result);
+        const response = await fetch('/api/find-route', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
 
-        } catch (error) {
-            throw error; // Let the parent function handle the error
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const result = await response.json();
+        console.log('Route result:', result);
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        this.currentResults = result;
+
+        // Display the route on the map
+        if (window.leafletMap && window.leafletMap.displayRoute) {
+            window.leafletMap.displayRoute(result);
+        }
+
+        // Show success message with route details
+        this.showRouteDetails(result);
     }
 
     async compareRoutes() {
-        try {
-            // Get both fastest and shortest routes
-            const fastestRoute = await window.leafletMap.findRoute('fastest');
-            const shortestRoute = await window.leafletMap.findRoute('shortest');
+        const requestData = {
+            start: window.leafletMap.selectedStart,
+            end: window.leafletMap.selectedEnd,
+            algorithm: 'compare',
+            use_real_streets: true
+        };
 
-            // For comparison, show the fastest route on map
-            window.leafletMap.displayStreetRoute(fastestRoute);
+        console.log('Comparing routes with:', requestData);
 
-            const comparison = {
-                type: 'comparison',
-                fastest: fastestRoute,
-                shortest: shortestRoute,
-                comparison: {
-                    distance_difference: Math.abs(fastestRoute.distance - shortestRoute.distance),
-                    duration_difference: Math.abs(fastestRoute.duration - shortestRoute.duration),
-                    faster_route: fastestRoute.duration < shortestRoute.duration ? 'fastest' : 'shortest'
-                }
-            };
+        const response = await fetch('/api/find-route', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        });
 
-            this.currentResults = comparison;
-            this.displayComparisonResults(comparison);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-        } catch (error) {
-            throw error;
+        const result = await response.json();
+        console.log('Comparison result:', result);
+
+        if (result.error) {
+            throw new Error(result.error);
+        }
+
+        this.currentResults = result;
+
+        // Display comparison routes on the map
+        if (window.leafletMap && window.leafletMap.displayComparison) {
+            window.leafletMap.displayComparison(result.dijkstra, result.astar);
+        }
+
+        // Show comparison details
+        this.showComparisonDetails(result);
+    }
+
+    showRouteDetails(result) {
+        const algorithm = result.algorithm.charAt(0).toUpperCase() + result.algorithm.slice(1);
+
+        this.showSuccess(
+            `Route found using ${algorithm}! ` +
+            `Distance: ${result.total_distance} km, ` +
+            `Duration: ${result.duration_minutes} minutes`
+        );
+
+        // Enable export button
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.disabled = false;
         }
     }
 
-    displaySingleResult(result) {
-        // Display route on map
-        window.leafletMap.displayRoute(result);
+    showComparisonDetails(result) {
+        const comparison = result.comparison;
+        const dijkstra = result.dijkstra;
+        const astar = result.astar;
 
-        // Show results panel
-        this.showResultsPanel(result);
+        let message = `Route comparison completed!<br>`;
+        message += `<strong>Dijkstra:</strong> ${dijkstra.total_distance}km, ${dijkstra.duration_minutes}min, ${dijkstra.nodes_explored} nodes<br>`;
+        message += `<strong>A*:</strong> ${astar.total_distance}km, ${astar.duration_minutes}min, ${astar.nodes_explored} nodes<br>`;
+        message += `<strong>Faster algorithm:</strong> ${comparison.faster_algorithm}<br>`;
+        message += `<strong>Shorter path:</strong> ${comparison.shorter_path}`;
 
-        // Hide comparison panel
-        document.getElementById('comparisonPanel').style.display = 'none';
-
-        // Enable export button
-        document.getElementById('exportBtn').disabled = false;
-
-        this.showSuccess(`Route found! Distance: ${(result.distance / 1000).toFixed(2)} km, Duration: ${Math.round(result.duration / 60)} minutes`);
-    }
-
-    displayComparisonResults(results) {
-        // Display the faster route on map (or shortest if preferred)
-        const routeToShow = results.fastest.duration < results.shortest.duration ? results.fastest : results.shortest;
-        window.leafletMap.displayRoute(routeToShow);
-
-        // Show comparison panel
-        this.showComparisonPanel(results);
-
-        // Hide single results panel
-        document.getElementById('resultsPanel').style.display = 'none';
+        this.showSuccess(message);
 
         // Enable export button
-        document.getElementById('exportBtn').disabled = false;
-    }
-
-    showResultsPanel(result) {
-        const panel = document.getElementById('resultsPanel');
-        const content = document.getElementById('singleResult');
-
-        content.innerHTML = `
-            <h6 class="text-primary">${result.algorithm.toUpperCase()} Route</h6>
-            <div class="row">
-                <div class="col-6">
-                    <strong>Distance:</strong><br>
-                    <span class="text-primary">${(result.distance / 1000).toFixed(2)} km</span>
-                </div>
-                <div class="col-6">
-                    <strong>Duration:</strong><br>
-                    <span class="text-success">${Math.round(result.duration / 60)} min</span>
-                </div>
-            </div>
-            <div class="row mt-2">
-                <div class="col-12">
-                    <strong>Execution Time:</strong><br>
-                    <span class="text-info">${result.execution_time.toFixed(2)} ms</span>
-                </div>
-            </div>
-            ${result.error ? `<div class="mt-2"><small class="text-warning">Note: ${result.error}</small></div>` : ''}
-        `;
-
-        panel.style.display = 'block';
-    }
-
-    showComparisonPanel(results) {
-        const panel = document.getElementById('comparisonPanel');
-
-        // Populate fastest route results
-        const fastestDiv = document.getElementById('dijkstraResults');
-        fastestDiv.innerHTML = this.generateRouteHTML(results.fastest, 'Fastest Route');
-
-        // Populate shortest route results
-        const shortestDiv = document.getElementById('astarResults');
-        shortestDiv.innerHTML = this.generateRouteHTML(results.shortest, 'Shortest Route');
-
-        // Populate comparison summary
-        const summaryDiv = document.getElementById('comparisonSummary');
-        summaryDiv.innerHTML = this.generateComparisonHTML(results.comparison);
-
-        panel.style.display = 'block';
-    }
-
-    generateRouteHTML(result, routeName) {
-        return `
-            <div class="row">
-                <div class="col-6">
-                    <strong>Distance:</strong><br>
-                    <span class="text-primary">${(result.distance / 1000).toFixed(2)} km</span>
-                </div>
-                <div class="col-6">
-                    <strong>Duration:</strong><br>
-                    <span class="text-success">${Math.round(result.duration / 60)} min</span>
-                </div>
-            </div>
-            <div class="row mt-2">
-                <div class="col-12">
-                    <strong>Execution Time:</strong><br>
-                    <span class="text-info">${result.execution_time.toFixed(2)} ms</span>
-                </div>
-            </div>
-        `;
-    }
-
-    generateComparisonHTML(comparison) {
-        return `
-            <div class="row">
-                <div class="col-md-6">
-                    <div class="metric-item">
-                        <span class="metric-label">Time Saved:</span>
-                        <span class="metric-value text-success">
-                            ${Math.round(Math.abs(comparison.duration_difference) / 60)} minutes
-                        </span>
-                    </div>
-                </div>
-                <div class="col-md-6">
-                    <div class="metric-item">
-                        <span class="metric-label">Distance Difference:</span>
-                        <span class="metric-value text-info">
-                            ${(comparison.distance_difference / 1000).toFixed(2)} km
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="row mt-2">
-                <div class="col-12">
-                    <div class="alert alert-info">
-                        <strong>Recommendation:</strong> 
-                        The ${comparison.faster_route} route is recommended for optimal travel time.
-                    </div>
-                </div>
-            </div>
-        `;
+        const exportBtn = document.getElementById('exportBtn');
+        if (exportBtn) {
+            exportBtn.disabled = false;
+        }
     }
 
     exportRoute() {
@@ -238,95 +183,73 @@ class AlgorithmManager {
             return;
         }
 
-        const dataToExport = {
-            type: this.currentResults.type || 'single_route',
-            start_coordinates: window.leafletMap.selectedStart,
-            end_coordinates: window.leafletMap.selectedEnd,
-            ...this.currentResults,
-            timestamp: new Date().toISOString()
-        };
+        const dataStr = JSON.stringify(this.currentResults, null, 2);
+        const dataBlob = new Blob([dataStr], {type: 'application/json'});
 
-        this.downloadJSON(dataToExport, `route_${Date.now()}.json`);
-        this.showSuccess('Route exported successfully');
-    }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `route_${new Date().getTime()}.json`;
+        link.click();
 
-    downloadJSON(data, filename) {
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-
-    storeTestResult(result) {
-        this.testResults.push({
-            id: this.testResults.length + 1,
-            algorithm: result.algorithm,
-            start_coordinates: window.leafletMap.selectedStart,
-            end_coordinates: window.leafletMap.selectedEnd,
-            distance: result.distance,
-            duration: result.duration,
-            execution_time: result.execution_time,
-            timestamp: new Date().toISOString()
-        });
-
-        this.saveToLocalStorage();
-    }
-
-    saveToLocalStorage() {
-        localStorage.setItem('routeOptimizerResults', JSON.stringify(this.testResults));
-    }
-
-    loadFromLocalStorage() {
-        const stored = localStorage.getItem('routeOptimizerResults');
-        if (stored) {
-            this.testResults = JSON.parse(stored);
-        }
+        this.showSuccess('Route exported successfully!');
     }
 
     showLoading(show) {
-        const overlay = document.getElementById('loadingOverlay');
-        if (overlay) {
-            overlay.style.display = show ? 'flex' : 'none';
-            console.log(`Loading overlay ${show ? 'shown' : 'hidden'}`);
+        const btn = document.getElementById('findPathBtn');
+        if (show) {
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Computing Route...';
+            btn.disabled = true;
+        } else {
+            btn.innerHTML = 'Find Route';
+            btn.disabled = !(window.leafletMap && window.leafletMap.hasValidSelection());
         }
     }
 
-    showError(message) {
-        this.showToast(message, 'danger');
-    }
-
     showSuccess(message) {
-        this.showToast(message, 'success');
+        this.showAlert(message, 'success');
     }
 
-    showToast(message, type) {
-        const toast = document.createElement('div');
-        toast.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-        toast.style.top = '20px';
-        toast.style.right = '20px';
-        toast.style.zIndex = '9999';
-        toast.innerHTML = `
+    showError(message) {
+        this.showAlert(message, 'danger');
+    }
+
+    showAlert(message, type) {
+        // Remove existing alerts
+        const existingAlerts = document.querySelectorAll('.alert-custom');
+        existingAlerts.forEach(alert => alert.remove());
+
+        // Create new alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show alert-custom mt-3`;
+        alertDiv.innerHTML = `
             ${message}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
 
-        document.body.appendChild(toast);
+        // Insert after the buttons
+        const buttonsContainer = document.querySelector('.d-grid');
+        if (buttonsContainer) {
+            buttonsContainer.parentNode.insertBefore(alertDiv, buttonsContainer.nextSibling);
+        }
 
-        setTimeout(() => {
-            toast.classList.remove('show');
+        // Auto-remove success alerts after 5 seconds
+        if (type === 'success') {
             setTimeout(() => {
-                document.body.removeChild(toast);
-            }, 150);
-        }, 5000);
+                if (alertDiv && alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
     }
 }
 
-// Initialize algorithm manager
-document.addEventListener('DOMContentLoaded', () => {
-    window.algorithmManager = new AlgorithmManager();
+// Initialize algorithm manager when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing Algorithm Manager...');
+
+    // Wait for map to be ready
+    setTimeout(() => {
+        window.algorithmManager = new AlgorithmManager();
+        console.log('Algorithm Manager initialized');
+    }, 200);
 });

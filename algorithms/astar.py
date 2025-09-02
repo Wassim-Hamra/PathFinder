@@ -1,110 +1,62 @@
 import heapq
 import time
-import math
-from .performance_tracker import PerformanceTracker
+from typing import Dict, List, Tuple, Optional
+from .graph_utils import haversine_distance
 
-def astar_pathfinding(graph, start_id, end_id, constraint='distance', heuristic_weight=1.0, use_bidirectional=False):
+def astar_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List[int], int]:
     """
-    A* algorithm for pathfinding with performance tracking
+    A* algorithm implementation for finding shortest path with heuristic
+    Returns: (path, nodes_explored)
     """
-    tracker = PerformanceTracker()
-    tracker.start_timing()
+    def heuristic(node1: int, node2: int) -> float:
+        """Calculate heuristic distance between two nodes"""
+        coord1 = graph[node1]['coordinates']
+        coord2 = graph[node2]['coordinates']
+        return haversine_distance(coord1, coord2)
 
-    # Get nodes and edges from graph
-    nodes = {node['id']: node for node in graph['nodes']}
-    edges = graph['edges']
-
-    # Build adjacency list
-    adjacency = {}
-    for node_id in nodes:
-        adjacency[node_id] = []
-
-    for edge in edges:
-        source, target = edge['source'], edge['target']
-        weight = edge.get(constraint, edge.get('weight', 1))
-
-        adjacency[source].append((target, weight))
-        adjacency[target].append((source, weight))  # Undirected graph
-
-    def heuristic(node_a, node_b):
-        """Manhattan distance heuristic"""
-        x1, y1 = nodes[node_a]['x'], nodes[node_a]['y']
-        x2, y2 = nodes[node_b]['x'], nodes[node_b]['y']
-        return abs(x1 - x2) + abs(y1 - y2)
-
-    # Initialize data structures
-    g_score = {node_id: float('inf') for node_id in nodes}
-    f_score = {node_id: float('inf') for node_id in nodes}
-    previous = {node_id: None for node_id in nodes}
-
-    g_score[start_id] = 0
-    f_score[start_id] = heuristic_weight * heuristic(start_id, end_id)
-
-    # Priority queue: (f_score, node_id)
-    open_set = [(f_score[start_id], start_id)]
-    closed_set = set()
-    explored_nodes = []
+    open_set = [(0, start_node)]
+    came_from = {}
+    g_score = {node: float('inf') for node in graph}
+    g_score[start_node] = 0
+    f_score = {node: float('inf') for node in graph}
+    f_score[start_node] = heuristic(start_node, end_node)
+    nodes_explored = 0
 
     while open_set:
         current_f, current_node = heapq.heappop(open_set)
+        nodes_explored += 1
 
-        if current_node in closed_set:
-            continue
-
-        closed_set.add(current_node)
-        explored_nodes.append([nodes[current_node]['x'], nodes[current_node]['y']])
-        tracker.increment_nodes_explored()
-
-        # Found the target
-        if current_node == end_id:
+        # If we reached the destination
+        if current_node == end_node:
             break
 
         # Check neighbors
-        for neighbor, weight in adjacency.get(current_node, []):
-            if neighbor in closed_set:
-                continue
+        for neighbor_info in graph[current_node]['neighbors']:
+            neighbor = neighbor_info['node']
+            weight = neighbor_info['weight']
 
-            tentative_g = g_score[current_node] + weight
+            tentative_g_score = g_score[current_node] + weight
 
-            if tentative_g < g_score[neighbor]:
-                previous[neighbor] = current_node
-                g_score[neighbor] = tentative_g
-                f_score[neighbor] = tentative_g + heuristic_weight * heuristic(neighbor, end_id)
-                heapq.heappush(open_set, (f_score[neighbor], neighbor))
+            if tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current_node
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = g_score[neighbor] + heuristic(neighbor, end_node)
+
+                # Add to open set if not already there
+                if (f_score[neighbor], neighbor) not in open_set:
+                    heapq.heappush(open_set, (f_score[neighbor], neighbor))
 
     # Reconstruct path
     path = []
-    current = end_id
+    current = end_node
 
-    if g_score[end_id] == float('inf'):
-        # No path found
-        execution_time = tracker.get_execution_time()
-        return {
-            'algorithm': 'astar',
-            'path': [],
-            'total_distance': 0,
-            'execution_time': execution_time,
-            'nodes_explored': tracker.nodes_explored,
-            'explored_nodes': explored_nodes,
-            'error': 'No path found'
-        }
+    if current not in came_from and current != start_node:
+        return [], nodes_explored  # No path found
 
     while current is not None:
-        path.append([nodes[current]['x'], nodes[current]['y']])
-        current = previous[current]
+        path.append(current)
+        current = came_from.get(current)
 
     path.reverse()
-    execution_time = tracker.get_execution_time()
 
-    return {
-        'algorithm': 'astar',
-        'path': path,
-        'total_distance': g_score[end_id],
-        'execution_time': execution_time,
-        'nodes_explored': tracker.nodes_explored,
-        'explored_nodes': explored_nodes,
-        'path_details': {
-            'start': [nodes[start_id]['x'], nodes[start_id]['y']],
-            'end': [nodes[end_id]['x'], nodes[end_id]['y']]
-        }
-    }
+    return path, nodes_explored

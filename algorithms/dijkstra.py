@@ -1,97 +1,59 @@
 import heapq
 import time
-from .performance_tracker import PerformanceTracker
+from typing import Dict, List, Tuple, Optional
+from .graph_utils import haversine_distance
 
-def dijkstra_pathfinding(graph, start_id, end_id, constraint='distance'):
+def dijkstra_pathfinding(graph: Dict, start_node: int, end_node: int) -> Tuple[List[int], int]:
     """
-    Dijkstra's algorithm for pathfinding with performance tracking
+    Dijkstra's algorithm implementation for finding shortest path
+    Returns: (path, nodes_explored)
     """
-    tracker = PerformanceTracker()
-    tracker.start_timing()
-
-    # Get nodes and edges from graph
-    nodes = {node['id']: node for node in graph['nodes']}
-    edges = graph['edges']
-
-    # Build adjacency list
-    adjacency = {}
-    for node_id in nodes:
-        adjacency[node_id] = []
-
-    for edge in edges:
-        source, target = edge['source'], edge['target']
-        weight = edge.get(constraint, edge.get('weight', 1))
-
-        adjacency[source].append((target, weight))
-        adjacency[target].append((source, weight))  # Undirected graph
-
-    # Initialize distances and previous nodes
-    distances = {node_id: float('inf') for node_id in nodes}
-    previous = {node_id: None for node_id in nodes}
-    distances[start_id] = 0
-
-    # Priority queue: (distance, node_id)
-    pq = [(0, start_id)]
+    distances = {node: float('inf') for node in graph}
+    distances[start_node] = 0
+    previous = {}
     visited = set()
-    explored_nodes = []
+    priority_queue = [(0, start_node)]
+    nodes_explored = 0
 
-    while pq:
-        current_dist, current_node = heapq.heappop(pq)
+    while priority_queue:
+        current_distance, current_node = heapq.heappop(priority_queue)
 
         if current_node in visited:
             continue
 
         visited.add(current_node)
-        explored_nodes.append([nodes[current_node]['x'], nodes[current_node]['y']])
-        tracker.increment_nodes_explored()
+        nodes_explored += 1
 
-        # Found the target
-        if current_node == end_id:
+        # If we reached the destination
+        if current_node == end_node:
             break
 
         # Check neighbors
-        for neighbor, weight in adjacency.get(current_node, []):
-            if neighbor not in visited:
-                new_dist = current_dist + weight
+        for neighbor_info in graph[current_node]['neighbors']:
+            neighbor = neighbor_info['node']
+            weight = neighbor_info['weight']
 
-                if new_dist < distances[neighbor]:
-                    distances[neighbor] = new_dist
-                    previous[neighbor] = current_node
-                    heapq.heappush(pq, (new_dist, neighbor))
+            if neighbor in visited:
+                continue
+
+            new_distance = current_distance + weight
+
+            if new_distance < distances[neighbor]:
+                distances[neighbor] = new_distance
+                previous[neighbor] = current_node
+                heapq.heappush(priority_queue, (new_distance, neighbor))
 
     # Reconstruct path
     path = []
-    current = end_id
+    current = end_node
 
-    if distances[end_id] == float('inf'):
-        # No path found
-        execution_time = tracker.get_execution_time()
-        return {
-            'algorithm': 'dijkstra',
-            'path': [],
-            'total_distance': 0,
-            'execution_time': execution_time,
-            'nodes_explored': tracker.nodes_explored,
-            'explored_nodes': explored_nodes,
-            'error': 'No path found'
-        }
+    if current not in previous and current != start_node:
+        return [], nodes_explored  # No path found
 
     while current is not None:
-        path.append([nodes[current]['x'], nodes[current]['y']])
-        current = previous[current]
+        path.append(current)
+        current = previous.get(current)
 
     path.reverse()
-    execution_time = tracker.get_execution_time()
 
-    return {
-        'algorithm': 'dijkstra',
-        'path': path,
-        'total_distance': distances[end_id],
-        'execution_time': execution_time,
-        'nodes_explored': tracker.nodes_explored,
-        'explored_nodes': explored_nodes,
-        'path_details': {
-            'start': [nodes[start_id]['x'], nodes[start_id]['y']],
-            'end': [nodes[end_id]['x'], nodes[end_id]['y']]
-        }
-    }
+    return path, nodes_explored

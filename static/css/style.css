@@ -274,6 +274,33 @@ body {
     transform-origin: center center;
 }
 
+/* Enhanced 3D car container styles */
+.car-marker-3d {
+    background: none !important;
+    border: none !important;
+    z-index: 1000 !important;
+}
+
+.car-container-3d {
+    position: relative;
+    transition: transform 0.08s ease-out; /* Smooth rotation for realistic cars */
+    transform-origin: center center;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+}
+
+.car-shadow-3d {
+    position: absolute;
+    bottom: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 35px;
+    height: 12px;
+    background: radial-gradient(ellipse, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 70%, transparent 100%);
+    border-radius: 50%;
+    filter: blur(3px);
+    z-index: -1;
+}
+
 .car-shadow {
     position: absolute;
     bottom: -2px;
@@ -304,9 +331,48 @@ body {
     position: relative;
 }
 
-/* Car marker specific z-index */
-.car-marker {
-    z-index: 1000 !important;
+/* Simple circular markers */
+.simple-marker {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 2px solid white;
+    animation: markerDrop 0.3s ease-out;
+}
+
+.start-marker-circle {
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.end-marker-circle {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+}
+
+.marker-inner {
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+/* Marker drop animation */
+@keyframes markerDrop {
+    0% {
+        transform: translateY(-20px) scale(0.3);
+        opacity: 0;
+    }
+    60% {
+        transform: translateY(2px) scale(1.1);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
 }
 
 /* Responsive Design */

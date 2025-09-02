@@ -126,26 +126,20 @@ class LeafletMapComponent {
             icon: L.divIcon({
                 className: 'custom-marker start-marker',
                 html: `
-                    <div class="marker-pin start-pin">
-                        <div class="marker-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="m9 12 2 2 4-4"/>
-                            </svg>
-                        </div>
-                        <div class="marker-pulse start-pulse"></div>
+                    <div class="simple-marker start-marker-circle">
+                        <div class="marker-inner">S</div>
                     </div>
                 `,
-                iconSize: [40, 50],
-                iconAnchor: [20, 50], // Pin tip at exact click position
-                popupAnchor: [0, -50]
+                iconSize: [24, 24],
+                iconAnchor: [12, 12], // Center the marker on click position
+                popupAnchor: [0, -12]
             })
         }).addTo(this.map);
 
         // Add popup
         this.startMarker.bindPopup(
             `<div class="marker-popup start-popup">
-                <strong>🚀 Start Point</strong><br>
+                <strong>🚀 Start</strong><br>
                 <small>${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}</small>
             </div>`
         );
@@ -164,26 +158,20 @@ class LeafletMapComponent {
             icon: L.divIcon({
                 className: 'custom-marker end-marker',
                 html: `
-                    <div class="marker-pin end-pin">
-                        <div class="marker-icon">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-                                <circle cx="12" cy="10" r="3"/>
-                            </svg>
-                        </div>
-                        <div class="marker-pulse end-pulse"></div>
+                    <div class="simple-marker end-marker-circle">
+                        <div class="marker-inner">E</div>
                     </div>
                 `,
-                iconSize: [40, 50],
-                iconAnchor: [20, 50], // Pin tip at exact click position
-                popupAnchor: [0, -50]
+                iconSize: [24, 24],
+                iconAnchor: [12, 12], // Center the marker on click position
+                popupAnchor: [0, -12]
             })
         }).addTo(this.map);
 
         // Add popup
         this.endMarker.bindPopup(
             `<div class="marker-popup end-popup">
-                <strong>🎯 Destination</strong><br>
+                <strong>🎯 End</strong><br>
                 <small>${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}</small>
             </div>`
         );
@@ -376,11 +364,30 @@ class LeafletMapComponent {
     rotateCarIcon(marker, bearing) {
         const icon = marker.getElement();
         if (icon) {
-            const carContainer = icon.querySelector('.car-container');
+            const carContainer = icon.querySelector('.car-container-3d') || icon.querySelector('.car-container');
             if (carContainer) {
                 carContainer.style.transform = `rotate(${bearing}deg)`;
             }
         }
+    }
+
+    calculateBearing(start, end) {
+        const startLat = start[0] * Math.PI / 180;
+        const startLng = start[1] * Math.PI / 180;
+        const endLat = end[0] * Math.PI / 180;
+        const endLng = end[1] * Math.PI / 180;
+
+        const dLng = endLng - startLng;
+
+        const y = Math.sin(dLng) * Math.cos(endLat);
+        const x = Math.cos(startLat) * Math.sin(endLat) - Math.sin(startLat) * Math.cos(endLat) * Math.cos(dLng);
+
+        let bearing = Math.atan2(y, x) * 180 / Math.PI;
+
+        // Normalize bearing to 0-360 degrees
+        bearing = (bearing + 360) % 360;
+
+        return bearing;
     }
 
     addCarCompletionEffect(carMarker) {
@@ -547,36 +554,63 @@ class LeafletMapComponent {
         };
 
         const color = colors[algorithm] || colors.default;
+        const shadowColor = this.darkenColor(color, 0.3);
 
         return L.divIcon({
-            className: 'car-marker',
+            className: 'car-marker-3d',
             html: `
-                <div class="car-container" style="transform: rotate(0deg);">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1">
-                        <path d="M7 17h10v2H7v-2zM7 5h10v2H7V5zM7 9h10v2H7V9zM7 13h10v2H7v-2z"/>
-                        <rect x="6" y="6" width="12" height="12" rx="2" fill="${color}" stroke="white" stroke-width="1"/>
-                        <circle cx="9" cy="8" r="1" fill="white"/>
-                        <circle cx="15" cy="8" r="1" fill="white"/>
-                        <rect x="8" y="10" width="8" height="4" rx="1" fill="white" opacity="0.8"/>
+                <div class="car-container-3d" style="transform: rotate(0deg);">
+                    <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Car Shadow -->
+                        <ellipse cx="16" cy="28" rx="12" ry="2" fill="rgba(0,0,0,0.3)"/>
+                        
+                        <!-- Car Body -->
+                        <rect x="6" y="12" width="20" height="10" rx="2" fill="${color}" stroke="white" stroke-width="1"/>
+                        
+                        <!-- Car Roof -->
+                        <rect x="10" y="8" width="12" height="8" rx="3" fill="${color}" stroke="white" stroke-width="1"/>
+                        
+                        <!-- Windshield -->
+                        <rect x="10" y="8" width="12" height="3" rx="2" fill="#87CEEB" opacity="0.8"/>
+                        
+                        <!-- Headlights -->
+                        <circle cx="24" cy="14" r="1.5" fill="#FFFFFF" stroke="#DDD"/>
+                        <circle cx="24" cy="18" r="1.5" fill="#FFFFFF" stroke="#DDD"/>
+                        
+                        <!-- Rear lights -->
+                        <circle cx="8" cy="14" r="1" fill="#FF4444"/>
+                        <circle cx="8" cy="18" r="1" fill="#FF4444"/>
+                        
+                        <!-- Wheels -->
+                        <circle cx="11" cy="23" r="2.5" fill="#333" stroke="#666"/>
+                        <circle cx="21" cy="23" r="2.5" fill="#333" stroke="#666"/>
+                        <circle cx="11" cy="23" r="1.5" fill="#666"/>
+                        <circle cx="21" cy="23" r="1.5" fill="#666"/>
                     </svg>
-                    <div class="car-shadow"></div>
+                    <div class="car-shadow-3d"></div>
                 </div>
             `,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12]
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
         });
     }
 
-    calculateBearing(start, end) {
-        const lat1 = start[0] * Math.PI / 180;
-        const lat2 = end[0] * Math.PI / 180;
-        const deltaLng = (end[1] - start[1]) * Math.PI / 180;
+    darkenColor(color, factor) {
+        // Simple color darkening function
+        const hex = color.replace('#', '');
+        const r = Math.max(0, parseInt(hex.substr(0, 2), 16) * (1 - factor));
+        const g = Math.max(0, parseInt(hex.substr(2, 2), 16) * (1 - factor));
+        const b = Math.max(0, parseInt(hex.substr(4, 2), 16) * (1 - factor));
+        return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
+    }
 
-        const x = Math.sin(deltaLng) * Math.cos(lat2);
-        const y = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(deltaLng);
-
-        const bearing = Math.atan2(x, y) * 180 / Math.PI;
-        return (bearing + 360) % 360;
+    lightenColor(color, factor) {
+        // Simple color lightening function
+        const hex = color.replace('#', '');
+        const r = Math.min(255, parseInt(hex.substr(0, 2), 16) + (255 - parseInt(hex.substr(0, 2), 16)) * factor);
+        const g = Math.min(255, parseInt(hex.substr(2, 2), 16) + (255 - parseInt(hex.substr(2, 2), 16)) * factor);
+        const b = Math.min(255, parseInt(hex.substr(4, 2), 16) + (255 - parseInt(hex.substr(4, 2), 16)) * factor);
+        return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
     }
 }
 

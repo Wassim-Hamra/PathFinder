@@ -312,13 +312,15 @@ class LeafletMapComponent {
         }, 500);
     }
 
-    displayComparison(dijkstraResult, astarResult) {
+    displayComparison(dijkstraResult, astarResult, bidirectionalResult) {
         console.log('Displaying route comparison');
 
         this.clearRoute();
 
+        const layers = [];
+
         // Display Dijkstra route first
-        if (dijkstraResult.coordinates && dijkstraResult.coordinates.length > 0) {
+        if (dijkstraResult && dijkstraResult.coordinates && dijkstraResult.coordinates.length > 0) {
             const dijkstraLayer = L.polyline([], {
                 color: '#3b82f6',
                 weight: 5,
@@ -334,36 +336,64 @@ class LeafletMapComponent {
                     Nodes Explored: ${dijkstraResult.nodes_explored}
                 </div>
             `);
-
-            // Animate Dijkstra route (faster timing)
+            layers.push(dijkstraLayer);
             this.animateComparisonRoute(dijkstraResult.coordinates, dijkstraLayer, 0);
         }
 
-        // Display A* route with reduced delay
-        if (astarResult.coordinates && astarResult.coordinates.length > 0) {
-            setTimeout(() => {
-                const astarLayer = L.polyline([], {
-                    color: '#dc2626',
-                    weight: 5,
-                    opacity: 0,
-                    dashArray: '5, 10',
-                    className: 'astar-route'
-                }).addTo(this.map);
-                astarLayer.bindPopup(`
-                    <div class="route-popup astar-popup">
-                        <strong>🔴 A* Algorithm</strong><br>
-                        Distance: ${astarResult.total_distance}km<br>
-                        Duration: ${astarResult.duration_minutes}min<br>
-                        Nodes Explored: ${astarResult.nodes_explored}
-                    </div>
-                `);
-
-                // Animate A* route (faster timing)
-                this.animateComparisonRoute(astarResult.coordinates, astarLayer, 0);
-            }, 800); // Reduced from 1500ms to 800ms
+        // Display A* route
+        if (astarResult && astarResult.coordinates && astarResult.coordinates.length > 0) {
+            const astarLayer = L.polyline([], {
+                color: '#dc2626',
+                weight: 5,
+                opacity: 0,
+                dashArray: '5, 10',
+                className: 'astar-route'
+            }).addTo(this.map);
+            astarLayer.bindPopup(`
+                <div class="route-popup astar-popup">
+                    <strong>🔴 A* Algorithm</strong><br>
+                    Distance: ${astarResult.total_distance}km<br>
+                    Duration: ${astarResult.duration_minutes}min<br>
+                    Nodes Explored: ${astarResult.nodes_explored}
+                </div>
+            `);
+            layers.push(astarLayer);
+            this.animateComparisonRoute(astarResult.coordinates, astarLayer, 200);
         }
 
-        console.log('Comparison routes displayed');
+        // Display Bidirectional route (third) if provided
+        if (bidirectionalResult && bidirectionalResult.coordinates && bidirectionalResult.coordinates.length > 0) {
+            const biLayer = L.polyline([], {
+                color: '#8b5cf6',
+                weight: 5,
+                opacity: 0,
+                dashArray: '2, 6',
+                className: 'bidirectional-route'
+            }).addTo(this.map);
+            biLayer.bindPopup(`
+                <div class="route-popup bidirectional-popup">
+                    <strong>🟣 Bidirectional</strong><br>
+                    Distance: ${bidirectionalResult.total_distance}km<br>
+                    Duration: ${bidirectionalResult.duration_minutes}min<br>
+                    Nodes Explored: ${bidirectionalResult.nodes_explored}
+                </div>
+            `);
+            layers.push(biLayer);
+            this.animateComparisonRoute(bidirectionalResult.coordinates, biLayer, 400);
+        }
+
+        // Store layers so they get cleared later
+        this.auxLayers.push(...layers);
+
+        // Fit bounds to all layers + markers
+        setTimeout(() => {
+            const group = new L.featureGroup(layers);
+            if (this.startMarker) group.addLayer(this.startMarker);
+            if (this.endMarker) group.addLayer(this.endMarker);
+            if (layers.length) this.map.fitBounds(group.getBounds().pad(0.15));
+        }, 600);
+
+        console.log('Comparison routes displayed (up to 3 algorithms)');
     }
 
     animateComparisonRoute(coordinates, polyline, delay = 0) {

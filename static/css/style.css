@@ -803,6 +803,12 @@ body {
     border-left: 3px solid #dc3545;
 }
 
+/* Added bidirectional violet styling */
+.bidirectional-item {
+    background: linear-gradient(135deg, #ede9fe, #ddd6fe);
+    border-left: 3px solid #8b5cf6;
+}
+
 .algorithm-name {
     font-weight: 600;
     color: #495057;
@@ -1020,4 +1026,3 @@ canvas#trendChart {
 .mini-visual-charts .legend-dot {
     width:10px;height:10px;
 }
-

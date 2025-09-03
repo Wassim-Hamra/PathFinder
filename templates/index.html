@@ -42,7 +42,7 @@
                                 <option value="dijkstra">Dijkstra's Algorithm</option>
                                 <option value="astar">A* Algorithm</option>
                                 <option value="bidirectional">Bidirectional Dijkstra</option>
-                                <option value="compare">Compare Dijkstra vs A*</option>
+                                <option value="compare">Compare All (Dijkstra / A* / Bidirectional)</option>
                             </select>
                         </div>
 
@@ -90,6 +90,10 @@
                                                 <div class="complexity-item dijkstra-item">
                                                     <span class="algorithm-name">Dijkstra</span>
                                                     <span class="complexity-formula">O((V+E) log V)</span>
+                                                </div>
+                                                <div class="complexity-item bidirectional-item">
+                                                    <span class="algorithm-name">Bidirectional</span>
+                                                    <span class="complexity-formula">≈ 2·O((V+E) log V) frontier cut</span>
                                                 </div>
                                                 <div class="complexity-item astar-item">
                                                     <span class="algorithm-name">A*</span>

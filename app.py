@@ -27,21 +27,50 @@ def find_route():
             return jsonify({'error': 'Start and end coordinates are required'}), 400
 
         if algorithm == 'compare':
-            # Compare Dijkstra vs A* algorithms on the same street network
+            # Run all three algorithms for comparison
             dijkstra_result = find_path_with_algorithm(start_coords, end_coords, 'dijkstra')
             astar_result = find_path_with_algorithm(start_coords, end_coords, 'astar')
+            bidirectional_result = find_path_with_algorithm(start_coords, end_coords, 'bidirectional')
+
+            # Helper to extract numeric safely
+            def num(v, default=0):
+                try:
+                    return float(v)
+                except Exception:
+                    return default
+
+            # Determine fastest & shortest among three
+            times = {
+                'Dijkstra': num(dijkstra_result.get('execution_time')),
+                'A*': num(astar_result.get('execution_time')),
+                'Bidirectional': num(bidirectional_result.get('execution_time'))
+            }
+            dists = {
+                'Dijkstra': num(dijkstra_result.get('total_distance')),
+                'A*': num(astar_result.get('total_distance')),
+                'Bidirectional': num(bidirectional_result.get('total_distance'))
+            }
+            # Identify winners
+            faster_algorithm = min(times, key=times.get)
+            shorter_path = min(dists, key=dists.get)
+
+            comparison_payload = {
+                'fastest_algorithm': faster_algorithm,
+                'shortest_path': shorter_path,
+                'time_spread_ms': round(max(times.values()) - min(times.values()), 2),
+                'distance_spread_km': round(max(dists.values()) - min(dists.values()), 3),
+                'rankings': {
+                    'execution_time_ms': dict(sorted(times.items(), key=lambda x: x[1])),
+                    'total_distance_km': dict(sorted(dists.items(), key=lambda x: x[1]))
+                }
+            }
 
             return jsonify({
                 'type': 'comparison',
                 'dijkstra': dijkstra_result,
                 'astar': astar_result,
-                'comparison': {
-                    'distance_difference': abs(float(dijkstra_result['total_distance']) - float(astar_result['total_distance'])),
-                    'time_difference': abs(float(dijkstra_result['execution_time']) - float(astar_result['execution_time'])),
-                    'nodes_difference': abs(int(dijkstra_result['nodes_explored']) - int(astar_result['nodes_explored'])),
-                    'faster_algorithm': 'A*' if float(astar_result['execution_time']) < float(dijkstra_result['execution_time']) else 'Dijkstra',
-                    'shorter_path': 'A*' if float(astar_result['total_distance']) < float(dijkstra_result['total_distance']) else 'Dijkstra'
-                }
+                'bidirectional': bidirectional_result,
+                'comparison': comparison_payload
             })
         else:
             # Single algorithm execution

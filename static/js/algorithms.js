@@ -188,34 +188,37 @@ class AlgorithmManager {
 
         this.currentResults = result;
 
+        // Record metric histories for all three
         this.recordMetricHistory(result.dijkstra);
         this.recordMetricHistory(result.astar);
+        if (result.bidirectional) this.recordMetricHistory(result.bidirectional);
         this.updateMiniComplexityChart();
 
-        // Record both algorithms' node counts
+        // Record node counts
         this.recordNodeHistory('dijkstra', result.dijkstra.nodes_explored || (result.dijkstra.performance_analysis?.complexity_analysis?.nodes_explored));
         this.recordNodeHistory('astar', result.astar.nodes_explored || (result.astar.performance_analysis?.complexity_analysis?.nodes_explored));
+        if (result.bidirectional) this.recordNodeHistory('bidirectional', result.bidirectional.nodes_explored || (result.bidirectional.performance_analysis?.complexity_analysis?.nodes_explored));
         this.updateMiniComplexityChart();
 
-        // Display comparison routes on the map
+        // Display comparison routes (now supports 3)
         if (window.leafletMap && window.leafletMap.displayComparison) {
-            window.leafletMap.displayComparison(result.dijkstra, result.astar);
+            window.leafletMap.displayComparison(result.dijkstra, result.astar, result.bidirectional);
         }
 
-        // Update performance display with comparison data
+        // Update performance area
         this.updateComparisonPerformance(result);
 
-        // Show comparison details
-        const comparison = result.comparison;
-        const dijkstra = result.dijkstra;
-        const astar = result.astar;
-
+        // Build success message summarizing all algorithms
+        const cmp = result.comparison || {};
+        const dj = result.dijkstra; const as = result.astar; const bi = result.bidirectional;
         let message = `Route comparison completed!<br>`;
-        message += `<strong>Dijkstra:</strong> ${dijkstra.total_distance}km, ${dijkstra.duration_minutes}min, ${dijkstra.nodes_explored} nodes<br>`;
-        message += `<strong>A*:</strong> ${astar.total_distance}km, ${astar.duration_minutes}min, ${astar.nodes_explored} nodes<br>`;
-        message += `<strong>Faster algorithm:</strong> ${comparison.faster_algorithm}<br>`;
-        message += `<strong>Shorter path:</strong> ${comparison.shorter_path}`;
-
+        message += `<strong>Dijkstra:</strong> ${dj.total_distance}km, ${dj.duration_minutes}min, ${dj.nodes_explored} nodes<br>`;
+        message += `<strong>A*:</strong> ${as.total_distance}km, ${as.duration_minutes}min, ${as.nodes_explored} nodes<br>`;
+        if (bi) message += `<strong>Bidirectional:</strong> ${bi.total_distance}km, ${bi.duration_minutes}min, ${bi.nodes_explored} nodes<br>`;
+        if (cmp.fastest_algorithm) message += `<strong>Fastest:</strong> ${cmp.fastest_algorithm}<br>`;
+        if (cmp.shortest_path) message += `<strong>Shortest:</strong> ${cmp.shortest_path}<br>`;
+        if (cmp.time_spread_ms !== undefined) message += `<strong>Time Spread:</strong> ${cmp.time_spread_ms}ms<br>`;
+        if (cmp.distance_spread_km !== undefined) message += `<strong>Distance Spread:</strong> ${cmp.distance_spread_km}km`;
         this.showSuccess(message);
     }
 
@@ -408,24 +411,41 @@ class AlgorithmManager {
         if (!result || !result.dijkstra || !result.astar) return;
         const dijkstra = result.dijkstra;
         const astar = result.astar;
+        const bidirectional = result.bidirectional;
         const comparison = result.comparison || {};
         const algEl = document.getElementById('lastRouteAlgorithm');
         const timeEl = document.getElementById('lastExecutionTime');
         const nodesEl = document.getElementById('lastNodesExplored');
         const effEl = document.getElementById('lastEfficiency');
-        if (algEl) algEl.textContent = 'Comparison';
-        if (timeEl) timeEl.textContent = `D:${dijkstra.execution_time}ms / A*:${astar.execution_time}ms`;
-        if (nodesEl) nodesEl.textContent = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
+        if (algEl) algEl.textContent = 'Comparison (3)';
+        if (timeEl) {
+            let t = `D:${dijkstra.execution_time}ms / A*:${astar.execution_time}ms`;
+            if (bidirectional) t += ` / Bi:${bidirectional.execution_time}ms`;
+            timeEl.textContent = t;
+        }
+        if (nodesEl) {
+            let n = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
+            if (bidirectional) n += ` / ${bidirectional.nodes_explored}`;
+            nodesEl.textContent = n;
+        }
         const dEff = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
         const aEff = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
-        if (effEl) effEl.textContent = `${dEff.toFixed(1)}% / ${aEff.toFixed(1)}%`;
+        const bEff = bidirectional?.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
+        if (effEl) {
+            let e = `${dEff.toFixed(1)}% / ${aEff.toFixed(1)}%`;
+            if (bidirectional) e += ` / ${bEff.toFixed(1)}%`;
+            effEl.textContent = e;
+        }
         const insightsDiv = document.getElementById('performanceInsights');
         if (insightsDiv) {
+            const fast = comparison.fastest_algorithm || '-';
+            const short = comparison.shortest_path || '-';
             insightsDiv.innerHTML = `
                 <div class="insight-item"><strong>Comparison Results</strong></div>
-                <div class="insight-item">Faster: ${comparison.faster_algorithm || '-'}</div>
-                <div class="insight-item">Shorter: ${comparison.shorter_path || '-'}</div>
-                <div class="insight-item">Time Δ: ${(comparison.time_difference||0).toFixed ? (comparison.time_difference).toFixed(2) : comparison.time_difference}ms</div>
+                <div class="insight-item">Fastest: ${fast}</div>
+                <div class="insight-item">Shortest: ${short}</div>
+                <div class="insight-item">Δ Time: ${comparison.time_spread_ms ?? '-'} ms</div>
+                <div class="insight-item">Δ Distance: ${comparison.distance_spread_km ?? '-'} km</div>
             `;
         }
     }

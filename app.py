@@ -4,6 +4,7 @@ import time
 import requests
 from algorithms.dijkstra import dijkstra_pathfinding
 from algorithms.astar import astar_pathfinding
+from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
 from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
 
@@ -115,6 +116,14 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
                     penalty_factor = 1.25  # Higher penalty -> path cost discourages direct jumps
                     graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
                     graph[i + 2]['neighbors'].append({'node': i, 'weight': skip_distance * penalty_factor})
+        elif algorithm == 'bidirectional':
+            # Similar to dijkstra but slightly different frequency to showcase variation
+            for i in range(len(sampled_route) - 3):
+                if i % 5 == 0:
+                    skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 2]))
+                    penalty_factor = 1.22
+                    graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
+                    graph[i + 2]['neighbors'].append({'node': i, 'weight': skip_distance * penalty_factor})
         else:  # A* (or other future heuristic-based)
             # More frequent, lower-penalty forward skips + occasional longer skip -> heuristic benefits
             for i in range(len(sampled_route) - 3):
@@ -134,6 +143,8 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
             path, nodes_explored, tracker = dijkstra_pathfinding(graph, 0, len(sampled_route) - 1, tracker)
         elif algorithm == 'astar':
             path, nodes_explored, tracker = astar_pathfinding(graph, 0, len(sampled_route) - 1, tracker)
+        elif algorithm == 'bidirectional':
+            path, nodes_explored, tracker = bidirectional_dijkstra_pathfinding(graph, 0, len(sampled_route) - 1, tracker)
         else:
             return {'error': f'Unknown algorithm: {algorithm}'}
 
@@ -191,6 +202,24 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
                 }
             }
         }
+        if algorithm == 'bidirectional':
+            # Map forward/reverse node ids to coordinates using sampled_route indexing
+            forward_coords = []
+            reverse_coords = []
+            for nid in tracker.forward_nodes:
+                if 0 <= nid < len(sampled_route):
+                    forward_coords.append(sampled_route[nid])
+            for nid in tracker.reverse_nodes:
+                if 0 <= nid < len(sampled_route):
+                    reverse_coords.append(sampled_route[nid])
+            meeting_coord = None
+            if tracker.meeting_node is not None and 0 <= tracker.meeting_node < len(sampled_route):
+                meeting_coord = sampled_route[tracker.meeting_node]
+            result['bidirectional'] = {
+                'forward_explored': forward_coords,
+                'reverse_explored': reverse_coords,
+                'meeting_node': meeting_coord
+            }
 
         return result
 

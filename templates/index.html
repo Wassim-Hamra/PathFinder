@@ -41,6 +41,7 @@
                             <select class="form-select" id="algorithmSelect">
                                 <option value="dijkstra">Dijkstra's Algorithm</option>
                                 <option value="astar">A* Algorithm</option>
+                                <option value="bidirectional">Bidirectional Dijkstra</option>
                                 <option value="compare">Compare Dijkstra vs A*</option>
                             </select>
                         </div>
@@ -106,28 +107,26 @@
                                                 <option value="priority_queue_operations">Priority Queue Ops</option>
                                             </select>
                                         </div>
-
-                                        <div class="mini-chart" id="miniComplexityChart">
-                                            <div class="chart-title" id="miniChartTitle">Node Exploration Efficiency</div>
-                                            <div class="mini-bars">
-                                                <div class="mini-bar-group" data-group="1">
-                                                    <div class="mini-bar dijkstra-mini" data-algo="dijkstra"></div>
-                                                    <div class="mini-bar astar-mini" data-algo="astar"></div>
-                                                    <div class="bar-label">Sample 1</div>
+                                        <div class="mini-visual-charts">
+                                            <div class="chart-title" id="miniChartTitle">Node Exploration (last 3 runs)</div>
+                                            <canvas id="trendChart" width="300" height="90"></canvas>
+                                            <div class="gauge-row mt-2">
+                                                <div class="gauge-container">
+                                                    <canvas id="gaugeDijkstra" width="120" height="120"></canvas>
+                                                    <div class="gauge-label">Dijkstra</div>
                                                 </div>
-                                                <div class="mini-bar-group" data-group="2">
-                                                    <div class="mini-bar dijkstra-mini" data-algo="dijkstra"></div>
-                                                    <div class="mini-bar astar-mini" data-algo="astar"></div>
-                                                    <div class="bar-label">Sample 2</div>
+                                                <div class="gauge-container">
+                                                    <canvas id="gaugeBidirectional" width="120" height="120"></canvas>
+                                                    <div class="gauge-label">Bidirectional</div>
                                                 </div>
-                                                <div class="mini-bar-group" data-group="3">
-                                                    <div class="mini-bar dijkstra-mini" data-algo="dijkstra"></div>
-                                                    <div class="mini-bar astar-mini" data-algo="astar"></div>
-                                                    <div class="bar-label">Sample 3</div>
+                                                <div class="gauge-container">
+                                                    <canvas id="gaugeAstar" width="120" height="120"></canvas>
+                                                    <div class="gauge-label">A*</div>
                                                 </div>
                                             </div>
-                                            <div class="mini-legend">
+                                            <div class="mini-legend mt-1">
                                                 <span><span class="legend-dot dijkstra-dot"></span>Dijkstra</span>
+                                                <span><span class="legend-dot bidirectional-dot"></span>Bidirectional</span>
                                                 <span><span class="legend-dot astar-dot"></span>A*</span>
                                             </div>
                                         </div>

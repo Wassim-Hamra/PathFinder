@@ -14,6 +14,9 @@ class PerformanceTracker:
         self.algorithm_name = ""
         self.graph_size = 0  # Number of nodes in graph
         self.edge_count = 0  # Number of edges in graph
+        self.forward_nodes = []  # For bidirectional visualization
+        self.reverse_nodes = []  # For bidirectional visualization
+        self.meeting_node = None  # Bidirectional meeting node
 
     def start_timing(self):
         """Start timing the algorithm execution"""
@@ -90,7 +93,7 @@ class PerformanceTracker:
                 }
             }
 
-        elif self.algorithm_name.lower() == 'astar' or self.algorithm_name.lower() == 'a*':
+        elif self.algorithm_name.lower() in ('astar', 'a*'):
             # A* complexity depends on heuristic quality
             theoretical_complexity = f"O(b^d) where b=branching factor, d=depth"
 
@@ -111,6 +114,22 @@ class PerformanceTracker:
                     "calls_per_node": (self.heuristic_calls / self.nodes_explored) if self.nodes_explored > 0 else 0,
                     "guidance_quality": "Good" if self.nodes_explored < V * 0.5 else "Average" if self.nodes_explored < V * 0.8 else "Poor"
                 }
+            }
+        elif self.algorithm_name.lower() in ('bidirectional', 'bidirectional dijkstra', 'bi-dijkstra'):
+            theoretical_complexity = f"~2 * O((V + E) log V) but reduced frontier"
+            if V > 0:
+                theoretical_ops = (V + E) * (math.log2(V) if V > 1 else 1) / 2
+            else:
+                theoretical_ops = 0
+            analysis = {
+                "algorithm": "Bidirectional Dijkstra",
+                "theoretical_complexity": theoretical_complexity,
+                "theoretical_operations": int(theoretical_ops),
+                "nodes_explored": self.nodes_explored,
+                "edges_relaxed": self.edges_relaxed,
+                "priority_queue_operations": self.priority_queue_operations,
+                "efficiency_ratio": (self.nodes_explored / V * 100) if V > 0 else 0,
+                "bidirectional_advantage": "Reduced search space from both ends"
             }
         else:
             # Unknown algorithm fallback
@@ -154,7 +173,7 @@ class PerformanceTracker:
                 "total_memory_estimate": V * 3,  # Rough estimate
                 "actual_peak_usage": self.memory_usage
             }
-        elif self.algorithm_name.lower() == 'astar' or self.algorithm_name.lower() == 'a*':
+        elif self.algorithm_name.lower() in ('astar', 'a*'):
             return {
                 "algorithm": "A* Algorithm",
                 "space_complexity": f"O(V) = O({V})",
@@ -165,6 +184,20 @@ class PerformanceTracker:
                     "open_set": f"O(V) worst case = {V}"
                 },
                 "total_memory_estimate": V * 4,  # Rough estimate
+                "actual_peak_usage": self.memory_usage
+            }
+        elif self.algorithm_name.lower() in ('bidirectional', 'bidirectional dijkstra', 'bi-dijkstra'):
+            return {
+                "algorithm": "Bidirectional Dijkstra",
+                "space_complexity": f"O(V) = O({V})",
+                "data_structures": {
+                    "forward_distances": V,
+                    "reverse_distances": V,
+                    "forward_prev": V,
+                    "reverse_prev": V,
+                    "priority_queues": "O(V) combined"
+                },
+                "total_memory_estimate": V * 4,
                 "actual_peak_usage": self.memory_usage
             }
 
@@ -193,13 +226,20 @@ class PerformanceTracker:
                 else:
                     insights.append("Dijkstra performed extensive edge relaxations - thorough search")
 
-        elif self.algorithm_name.lower() == 'astar' or self.algorithm_name.lower() == 'a*':
+        elif self.algorithm_name.lower() in ('astar', 'a*'):
             if self.heuristic_calls > 0:
                 heuristic_efficiency = self.heuristic_calls / self.nodes_explored if self.nodes_explored > 0 else 0
                 if heuristic_efficiency > 2:
                     insights.append("A* heuristic guided search effectively towards the goal")
                 else:
                     insights.append("A* heuristic provided moderate guidance")
+        elif self.algorithm_name.lower() in ('bidirectional', 'bidirectional dijkstra', 'bi-dijkstra'):
+            if self.edges_relaxed > 0:
+                relaxation_ratio = self.edges_relaxed / self.edge_count if self.edge_count > 0 else 0
+                if relaxation_ratio < 0.3:
+                    insights.append("Bidirectional Dijkstra performed minimal edge relaxations - sparse exploration")
+                else:
+                    insights.append("Bidirectional Dijkstra performed extensive edge relaxations - thorough search")
 
         # Execution time insights
         exec_time = self.get_execution_time()
@@ -257,12 +297,19 @@ class PerformanceTracker:
                 "Finds shortest paths to all nodes",
                 "No heuristic required"
             ]
-        elif self.algorithm_name.lower() == 'astar' or self.algorithm_name.lower() == 'a*':
+        elif self.algorithm_name.lower() in ('astar', 'a*'):
             return [
                 "Often faster than Dijkstra with good heuristic",
                 "Goal-directed search",
                 "Optimal with admissible heuristic",
                 "Reduces search space significantly"
+            ]
+        elif self.algorithm_name.lower() in ('bidirectional', 'bidirectional dijkstra', 'bi-dijkstra'):
+            return [
+                "Reduced search space by exploring from both ends",
+                "Can be faster than unidirectional Dijkstra in practice",
+                "Effective in finding shortest paths in large graphs",
+                "Combines benefits of forward and backward search"
             ]
         return []
 
@@ -275,14 +322,29 @@ class PerformanceTracker:
                 "Social network analysis",
                 "When no good heuristic is available"
             ]
-        elif self.algorithm_name.lower() == 'astar' or self.algorithm_name.lower() == 'a*':
+        elif self.algorithm_name.lower() in ('astar', 'a*'):
             return [
                 "GPS navigation systems",
                 "Game AI pathfinding",
                 "Robotics path planning",
                 "When goal location is known"
             ]
+        elif self.algorithm_name.lower() in ('bidirectional', 'bidirectional dijkstra', 'bi-dijkstra'):
+            return [
+                "Large scale road networks",
+                "Complex network routing",
+                "Situations with available heuristics from both ends",
+                "When optimization for time is critical"
+            ]
         return []
+
+    def record_forward_node(self, node_id: int):
+        """Record a node explored in the forward search (for bidirectional algorithms)"""
+        self.forward_nodes.append(node_id)
+
+    def record_reverse_node(self, node_id: int):
+        """Record a node explored in the reverse search (for bidirectional algorithms)"""
+        self.reverse_nodes.append(node_id)
 
     def reset(self):
         """Reset all tracking metrics"""
@@ -293,3 +355,6 @@ class PerformanceTracker:
         self.heuristic_calls = 0
         self.priority_queue_operations = 0
         self.memory_usage = 0
+        self.forward_nodes = []
+        self.reverse_nodes = []
+        self.meeting_node = None

@@ -15,6 +15,8 @@ class LeafletMapComponent {
         this.isInitialized = false;
         this.isZooming = false;
         this.currentAnimation = null;
+        this.auxLayers = []; // store temporary layers (circles, partial lines, markers)
+        this.bidirectionalAnimating = false;
 
         this.options = {
             defaultZoom: 13,
@@ -25,7 +27,10 @@ class LeafletMapComponent {
         this.colors = {
             route: '#3b82f6',
             start: '#22c55e',
-            end: '#dc2626'
+            end: '#dc2626',
+            bidirectionalForward: '#007bff',
+            bidirectionalReverse: '#dc3545',
+            meeting: '#8b5cf6'
         };
     }
 
@@ -60,57 +65,35 @@ class LeafletMapComponent {
 
     setupMapClickHandler() {
         this.map.on('click', (e) => {
-            // Ignore clicks during zoom operations
-            if (this.isZooming) {
+            if (this.isZooming) return;
+            const { lat, lng } = e.latlng;
+
+            // Treat any existing route layer OR aux layers as active route state
+            const routePresent = !!this.routeLayer || (this.auxLayers && this.auxLayers.length > 0);
+
+            if (routePresent) {
+                this.clearSelection();
+                this.setStartPoint([lat, lng]);
+                this.updateUI();
                 return;
             }
 
-            const { lat, lng } = e.latlng;
-            console.log(`Map clicked at: ${lat}, ${lng}`);
-
-            // Only process clicks if no route is currently displayed
-            // This prevents accidental clearing during zoom operations
-            if (!this.routeLayer) {
-                if (!this.selectedStart) {
-                    this.setStartPoint([lat, lng]);
-                } else if (!this.selectedEnd) {
-                    this.setEndPoint([lat, lng]);
-                } else {
-                    // If both points are selected but no route, allow reset
-                    this.clearSelection();
-                    this.setStartPoint([lat, lng]);
-                }
+            // Normal selection logic when no existing route
+            if (!this.selectedStart) {
+                this.setStartPoint([lat, lng]);
+            } else if (!this.selectedEnd) {
+                this.setEndPoint([lat, lng]);
             } else {
-                // If route exists and user deliberately clicks, allow clearing
-                // Only clear if click is far from existing markers
-                const startDistance = this.selectedStart ?
-                    this.map.distance(e.latlng, L.latLng(this.selectedStart[0], this.selectedStart[1])) : Infinity;
-                const endDistance = this.selectedEnd ?
-                    this.map.distance(e.latlng, L.latLng(this.selectedEnd[0], this.selectedEnd[1])) : Infinity;
-
-                // Only reset if click is more than 100 meters from existing markers
-                if (startDistance > 100 && endDistance > 100) {
-                    // Clear and set new start point without confirmation
-                    this.clearSelection();
-                    this.setStartPoint([lat, lng]);
-                }
+                // Both points already set but no route yet; restart selection
+                this.clearSelection();
+                this.setStartPoint([lat, lng]);
             }
 
             this.updateUI();
         });
 
-        // Add zoom event handlers to prevent route clearing during zoom
-        this.map.on('zoomstart', () => {
-            // Disable click handling during zoom
-            this.isZooming = true;
-        });
-
-        this.map.on('zoomend', () => {
-            // Re-enable click handling after zoom
-            setTimeout(() => {
-                this.isZooming = false;
-            }, 100);
-        });
+        this.map.on('zoomstart', () => { this.isZooming = true; });
+        this.map.on('zoomend', () => { setTimeout(() => { this.isZooming = false; }, 100); });
     }
 
     setStartPoint(coords) {
@@ -220,21 +203,31 @@ class LeafletMapComponent {
     }
 
     clearRoute() {
+        // Stop any ongoing bidirectional animation
+        this.bidirectionalAnimating = false;
+        if (this.currentAnimation) {
+            clearTimeout(this.currentAnimation);
+            this.currentAnimation = null;
+        }
         // Clear main route layer
         if (this.routeLayer) {
             this.map.removeLayer(this.routeLayer);
             this.routeLayer = null;
         }
-
-        // Clear any comparison route layers
+        // Remove recorded auxiliary layers
+        if (this.auxLayers && this.auxLayers.length) {
+            this.auxLayers.forEach(l => {
+                if (l && this.map.hasLayer(l)) this.map.removeLayer(l);
+            });
+            this.auxLayers = [];
+        }
+        // Also remove any remaining polylines that slipped through
         this.map.eachLayer((layer) => {
-            if (layer instanceof L.Polyline && layer !== this.routeLayer) {
-                // Remove any polyline that's not the main route (comparison routes)
+            if (layer instanceof L.Polyline) {
                 this.map.removeLayer(layer);
             }
         });
-
-        console.log('All routes cleared from map');
+        console.log('All routes and auxiliary layers cleared from map');
     }
 
     displayRoute(routeData) {
@@ -399,8 +392,89 @@ class LeafletMapComponent {
         }, delay);
     }
 
+    displayBidirectionalRoute(routeData) {
+        this.clearRoute();
+        if (!routeData.coordinates || routeData.coordinates.length < 2) return;
+        this.bidirectionalAnimating = true;
+
+        const coords = routeData.coordinates;
+        const forwardExplored = routeData.bidirectional?.forward_explored || [];
+        const reverseExplored = routeData.bidirectional?.reverse_explored || [];
+        const meeting = routeData.bidirectional?.meeting_node;
+
+        const fullRoute = L.polyline(coords, { color: '#6366f1', weight: 5, opacity: 0 }).addTo(this.map);
+        this.routeLayer = fullRoute;
+
+        const forwardLine = L.polyline([], { color: this.colors.bidirectionalForward, weight: 6, opacity: 0.85 }).addTo(this.map);
+        const reverseLine = L.polyline([], { color: this.colors.bidirectionalReverse, weight: 6, opacity: 0.85 }).addTo(this.map);
+        this.auxLayers.push(forwardLine, reverseLine);
+
+        const explorationGroup = L.layerGroup().addTo(this.map);
+        this.auxLayers.push(explorationGroup);
+        const haloStyleF = { radius: 6, color: this.colors.bidirectionalForward, weight: 2, fillColor: this.colors.bidirectionalForward, fillOpacity: 0.35 };
+        const haloStyleR = { radius: 6, color: this.colors.bidirectionalReverse, weight: 2, fillColor: this.colors.bidirectionalReverse, fillOpacity: 0.35 };
+
+        let meetingIndex = -1;
+        if (meeting) {
+            let minD = Infinity;
+            coords.forEach((c, idx) => {
+                const dLat = c[0] - meeting[0];
+                const dLng = c[1] - meeting[1];
+                const d2 = dLat*dLat + dLng*dLng;
+                if (d2 < minD) { minD = d2; meetingIndex = idx; }
+            });
+        } else {
+            meetingIndex = Math.floor(coords.length / 2);
+        }
+
+        const forwardSegment = coords.slice(0, meetingIndex + 1);
+        const reverseSegment = coords.slice(meetingIndex).reverse();
+
+        let fi = 0, ri = 0;
+        const speed = 25;
+        const step = () => {
+            if (!this.bidirectionalAnimating) return;
+            let progressed = false;
+            if (fi < forwardSegment.length) {
+                forwardLine.addLatLng(forwardSegment[fi]);
+                if (forwardExplored[fi]) explorationGroup.addLayer(L.circle(forwardExplored[fi], haloStyleF));
+                fi++; progressed = true;
+            }
+            if (ri < reverseSegment.length) {
+                reverseLine.addLatLng(reverseSegment[ri]);
+                if (reverseExplored[ri]) explorationGroup.addLayer(L.circle(reverseExplored[ri], haloStyleR));
+                ri++; progressed = true;
+            }
+            if (progressed) {
+                requestAnimationFrame(() => setTimeout(step, speed));
+            } else {
+                if (!this.bidirectionalAnimating) return;
+                fullRoute.setStyle({ opacity: 0.9 });
+                if (meeting) {
+                    const meetMarker = L.marker(meeting, {
+                        icon: L.divIcon({
+                            className: 'custom-marker',
+                            html: `<div style=\"width:20px;height:20px;border-radius:50%;background:#8b5cf6;border:2px solid #fff;box-shadow:0 0 6px rgba(139,92,246,0.6);\"></div>`,
+                            iconSize: [20,20],
+                            iconAnchor: [10,10]
+                        })
+                    }).addTo(this.map).bindPopup('<strong>Meeting Point</strong>');
+                    this.auxLayers.push(meetMarker);
+                }
+            }
+        };
+
+        setTimeout(() => {
+            const group = new L.featureGroup([fullRoute]);
+            if (this.startMarker) group.addLayer(this.startMarker);
+            if (this.endMarker) group.addLayer(this.endMarker);
+            this.map.fitBounds(group.getBounds().pad(0.1));
+        }, 50);
+
+        step();
+    }
+
     updateUI() {
-        // Update status display
         const statusDiv = document.getElementById('selectionStatus');
         if (statusDiv) {
             let statusText = '';
@@ -409,72 +483,43 @@ class LeafletMapComponent {
             } else {
                 statusText += '<span class="text-muted">○ Click map to set start point</span><br>';
             }
-
             if (this.selectedEnd) {
                 statusText += `<span class="text-danger">✓ End: ${this.selectedEnd[0].toFixed(4)}, ${this.selectedEnd[1].toFixed(4)}</span>`;
             } else {
                 statusText += '<span class="text-muted">○ Click map to set end point</span>';
             }
-
             statusDiv.innerHTML = statusText;
         }
-
-        // Enable/disable find route button
         const findBtn = document.getElementById('findPathBtn');
-        if (findBtn) {
-            findBtn.disabled = !(this.selectedStart && this.selectedEnd);
-        }
+        if (findBtn) findBtn.disabled = !(this.selectedStart && this.selectedEnd);
     }
 
-    getSelectedPoints() {
-        return {
-            start: this.selectedStart,
-            end: this.selectedEnd
-        };
-    }
-
-    hasValidSelection() {
-        return this.selectedStart && this.selectedEnd;
-    }
+    getSelectedPoints() { return { start: this.selectedStart, end: this.selectedEnd }; }
+    hasValidSelection() { return this.selectedStart && this.selectedEnd; }
 
     darkenColor(color, factor) {
-        // Simple color darkening function
         const hex = color.replace('#', '');
-        const r = Math.max(0, parseInt(hex.substr(0, 2), 16) * (1 - factor));
-        const g = Math.max(0, parseInt(hex.substr(2, 2), 16) * (1 - factor));
-        const b = Math.max(0, parseInt(hex.substr(4, 2), 16) * (1 - factor));
+        const r = Math.max(0, parseInt(hex.substr(0,2),16) * (1-factor));
+        const g = Math.max(0, parseInt(hex.substr(2,2),16) * (1-factor));
+        const b = Math.max(0, parseInt(hex.substr(4,2),16) * (1-factor));
         return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
     }
-
     lightenColor(color, factor) {
-        // Simple color lightening function
         const hex = color.replace('#', '');
-        const r = Math.min(255, parseInt(hex.substr(0, 2), 16) + (255 - parseInt(hex.substr(0, 2), 16)) * factor);
-        const g = Math.min(255, parseInt(hex.substr(2, 2), 16) + (255 - parseInt(hex.substr(2, 2), 16)) * factor);
-        const b = Math.min(255, parseInt(hex.substr(4, 2), 16) + (255 - parseInt(hex.substr(4, 2), 16)) * factor);
+        const r0 = parseInt(hex.substr(0,2),16), g0 = parseInt(hex.substr(2,2),16), b0 = parseInt(hex.substr(4,2),16);
+        const r = Math.min(255, r0 + (255-r0)*factor);
+        const g = Math.min(255, g0 + (255-g0)*factor);
+        const b = Math.min(255, b0 + (255-b0)*factor);
         return `rgb(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)})`;
     }
 }
 
-// Global map instance
 let leafletMap;
 
-// Initialize map when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM loaded, initializing map...');
-
-    // Wait a bit to ensure all dependencies are loaded
     setTimeout(() => {
-        leafletMap = new LeafletMapComponent('map', {
-            center: [40.7128, -74.0060], // NYC
-            defaultZoom: 13
-        });
-
+        leafletMap = new LeafletMapComponent('map', { center: [40.7128, -74.0060], defaultZoom: 13 });
         leafletMap.init();
-
-        // Make it globally accessible
         window.leafletMap = leafletMap;
-
-        console.log('Map setup complete');
     }, 100);
 });

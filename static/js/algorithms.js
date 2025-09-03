@@ -4,14 +4,17 @@ class AlgorithmManager {
         this.currentResults = null;
         this.noControls = false; // flag if controls are absent
 
-        this.nodeHistory = { dijkstra: [], astar: [] }; // store last 3 node counts per algorithm
+        this.nodeHistory = { dijkstra: [], astar: [], bidirectional: [] }; // added bidirectional
         this.maxHistory = 3;
 
         this.metricHistories = {
             dijkstra: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] },
-            astar: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] }
+            astar: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] },
+            bidirectional: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] }
         };
         this.currentMetric = 'nodes_explored';
+
+        this.colors = { dijkstra: '#007bff', bidirectional: '#8b5cf6', astar: '#dc3545' };
 
         this.setupEventListeners();
     }
@@ -140,8 +143,12 @@ class AlgorithmManager {
         this.updateMiniComplexityChart();
 
         // Display the route on the map
-        if (window.leafletMap && window.leafletMap.displayRoute) {
-            window.leafletMap.displayRoute(result);
+        if (window.leafletMap) {
+            if (result.algorithm === 'bidirectional' && window.leafletMap.displayBidirectionalRoute) {
+                window.leafletMap.displayBidirectionalRoute(result);
+            } else if (window.leafletMap.displayRoute) {
+                window.leafletMap.displayRoute(result);
+            }
         }
 
         // Update performance display with real data
@@ -289,7 +296,7 @@ class AlgorithmManager {
 
     recordMetricHistory(result) {
         if (!result || !result.algorithm) return;
-        const algo = result.algorithm === 'astar' ? 'astar' : 'dijkstra';
+        const algo = result.algorithm === 'astar' ? 'astar' : (result.algorithm === 'bidirectional' ? 'bidirectional' : 'dijkstra');
         const perf = result.performance_analysis?.complexity_analysis || {};
         const detailed = result.performance_analysis?.detailed_metrics || {};
         const snapshot = {
@@ -305,109 +312,122 @@ class AlgorithmManager {
         });
     }
 
-    updateMiniComplexityChart() {
-        const groups = document.querySelectorAll('.mini-bar-group');
-        if (!groups.length) return;
-        const metric = this.currentMetric;
-        const djVals = [...this.metricHistories.dijkstra[metric]];
-        const asVals = [...this.metricHistories.astar[metric]];
-        // If both empty, nothing to show
-        if (djVals.length === 0 && asVals.length === 0) return;
+    updateMiniComplexityChart() { this.updateVisualCharts(); }
 
-        const djRev = djVals.slice(-this.maxHistory).reverse();
-        const asRev = asVals.slice(-this.maxHistory).reverse();
-        const all = djRev.concat(asRev).filter(v => typeof v === 'number');
-        if (!all.length) return;
-        const maxAll = Math.max(...all);
-        const minAll = Math.min(...all);
-        const range = maxAll - minAll;
-        const identical = range === 0;
-        const fallbackHeights = [70, 55, 40];
-        const computeHeight = (val, idx) => {
-            if (val === undefined) return 0;
-            if (identical) return fallbackHeights[idx] || 35;
-            const norm = (val - minAll) / (range || 1);
-            const curved = Math.sqrt(norm);
-            return 25 + curved * 75;
+    updateVisualCharts() {
+        const metric = this.currentMetric;
+        const trendCanvas = document.getElementById('trendChart');
+        if (!trendCanvas) return;
+        const ctx = trendCanvas.getContext('2d');
+        const djVals = [...this.metricHistories.dijkstra[metric]];
+        const biVals = [...this.metricHistories.bidirectional[metric]];
+        const asVals = [...this.metricHistories.astar[metric]];
+        if (djVals.length === 0 && asVals.length === 0 && biVals.length === 0) {
+            ctx.clearRect(0,0,trendCanvas.width, trendCanvas.height);
+            return;
+        }
+        const maxAll = Math.max(1, ...djVals, ...asVals, ...biVals);
+        ctx.clearRect(0,0,trendCanvas.width, trendCanvas.height);
+        ctx.strokeStyle = '#cbd5e1';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(30,5); ctx.lineTo(30,80); ctx.lineTo(trendCanvas.width-5,80); ctx.stroke();
+        const plotSeries = (vals, color) => {
+            if (!vals.length) return;
+            const left = 30; const bottom = 80; const top = 10; const usableH = bottom - top; const w = trendCanvas.width - left - 10;
+            const stepX = vals.length > 1 ? (w / (vals.length - 1)) : 0;
+            ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.beginPath();
+            vals.forEach((v,i)=>{ const norm = v / maxAll; const y = bottom - norm * usableH; const x = left + i * stepX; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); });
+            ctx.stroke();
+            vals.forEach((v,i)=>{ const norm = v / maxAll; const y = bottom - norm * usableH; const x = left + i * stepX; ctx.fillStyle=color; ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fill(); });
         };
-        groups.forEach((group, idx) => {
-            const dBar = group.querySelector('.mini-bar.dijkstra-mini');
-            const aBar = group.querySelector('.mini-bar.astar-mini');
-            const dVal = djRev[idx];
-            const aVal = asRev[idx];
-            const dH = computeHeight(dVal, idx);
-            const aH = computeHeight(aVal, idx);
-            if (dBar) {
-                dBar.style.height = dVal !== undefined ? dH.toFixed(1) + '%' : '0%';
-                dBar.title = dVal !== undefined ? `Dijkstra ${metric}: ${dVal}` : 'No data';
-                dBar.style.opacity = (metric === 'heuristic_calls') ? 0.25 : 1; // dim metric not relevant
-            }
-            if (aBar) {
-                aBar.style.height = aVal !== undefined ? aH.toFixed(1) + '%' : '0%';
-                aBar.title = aVal !== undefined ? `A* ${metric}: ${aVal}` : 'No data';
-                aBar.style.opacity = (metric === 'edges_relaxed') ? 0.25 : 1;
-            }
-            const label = group.querySelector('.bar-label');
-            if (label) {
-                if (dVal !== undefined || aVal !== undefined) label.textContent = idx === 0 ? 'Latest' : `Run -${idx}`; else label.textContent = '—';
-            }
-        });
+        plotSeries(djVals, this.colors.dijkstra);
+        plotSeries(biVals, this.colors.bidirectional);
+        plotSeries(asVals, this.colors.astar);
+        ctx.fillStyle = '#64748b'; ctx.font = '10px Segoe UI';
+        ctx.fillText(maxAll.toString(), 2, 12);
+        ctx.fillText(Math.round(maxAll/2).toString(), 2, 42);
+        ctx.fillText('0', 10, 80);
+        this.drawGauge('gaugeDijkstra', djVals[djVals.length-1], maxAll, this.colors.dijkstra, metric === 'heuristic_calls');
+        this.drawGauge('gaugeBidirectional', biVals[biVals.length-1], maxAll, this.colors.bidirectional, metric === 'heuristic_calls');
+        this.drawGauge('gaugeAstar', asVals[asVals.length-1], maxAll, this.colors.astar, metric === 'edges_relaxed');
+    }
+
+    drawGauge(id, value, maxAll, color, dim) {
+        const canvas = document.getElementById(id);
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0,0,canvas.width, canvas.height);
+        if (value === undefined) { ctx.globalAlpha=0.2; ctx.fillStyle='#94a3b8'; ctx.fillText('No data', 30, canvas.height/2); ctx.globalAlpha=1; return; }
+        const radius = 50; const cx = canvas.width/2; const cy = canvas.height/2 + 10;
+        const start = Math.PI * 0.75; const end = Math.PI * 2.25; // 270 deg arc
+        // Track
+        ctx.lineWidth = 10; ctx.strokeStyle = '#e2e8f0'; ctx.beginPath(); ctx.arc(cx, cy, radius, start, end); ctx.stroke();
+        // Value
+        const frac = Math.min(1, value / maxAll);
+        ctx.strokeStyle = color; ctx.lineCap='round'; ctx.beginPath(); ctx.arc(cx, cy, radius, start, start + (end-start)*frac); ctx.stroke();
+        // Value text
+        ctx.fillStyle = dim ? 'rgba(100,116,139,0.4)' : '#334155'; ctx.font='12px Segoe UI'; ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(value.toString(), cx, cy-5);
+        ctx.font='10px Segoe UI'; ctx.fillStyle='#64748b'; ctx.fillText(this.metricLabelShort(this.currentMetric), cx, cy+18);
+        if (dim) { ctx.fillStyle='rgba(100,116,139,0.5)'; ctx.fillText('n/a', cx, cy+32); }
+    }
+
+    metricLabelShort(m){
+        switch(m){
+            case 'nodes_explored': return 'Nodes';
+            case 'edges_relaxed': return 'Edges';
+            case 'heuristic_calls': return 'Heuristic';
+            case 'priority_queue_operations': return 'PQ Ops';
+            default: return m;
+        }
+    }
+
+    // Added back performance display update methods (previously removed)
+    updatePerformanceDisplay(result) {
+        if (!result) return;
+        const analysis = result.performance_analysis?.complexity_analysis;
+        if (!analysis) return; // nothing to show yet
+        const algEl = document.getElementById('lastRouteAlgorithm');
+        const timeEl = document.getElementById('lastExecutionTime');
+        const nodesEl = document.getElementById('lastNodesExplored');
+        const effEl = document.getElementById('lastEfficiency');
+        if (algEl) algEl.textContent = result.algorithm || '-';
+        const execMs = analysis.execution_time_ms || result.execution_time;
+        if (timeEl) timeEl.textContent = (typeof execMs === 'number' ? execMs.toFixed(2) : execMs) + 'ms';
+        if (nodesEl) nodesEl.textContent = analysis.nodes_explored ?? result.nodes_explored ?? '-';
+        if (effEl) effEl.textContent = (analysis.efficiency_ratio?.toFixed ? analysis.efficiency_ratio.toFixed(1) : analysis.efficiency_ratio) + '%';
+        // Basic insights (reuse existing container if present)
+        const insightsDiv = document.getElementById('performanceInsights');
+        if (insightsDiv && analysis.performance_insights) {
+            insightsDiv.innerHTML = analysis.performance_insights.slice(0,2).map(i=>`<div class="insight-item">${i}</div>`).join('');
+        }
     }
 
     updateComparisonPerformance(result) {
-        // Update performance metrics for comparison
+        if (!result || !result.dijkstra || !result.astar) return;
         const dijkstra = result.dijkstra;
         const astar = result.astar;
-        const comparison = result.comparison;
-
-        // Show comparison in performance display
+        const comparison = result.comparison || {};
+        const algEl = document.getElementById('lastRouteAlgorithm');
+        const timeEl = document.getElementById('lastExecutionTime');
+        const nodesEl = document.getElementById('lastNodesExplored');
+        const effEl = document.getElementById('lastEfficiency');
+        if (algEl) algEl.textContent = 'Comparison';
+        if (timeEl) timeEl.textContent = `D:${dijkstra.execution_time}ms / A*:${astar.execution_time}ms`;
+        if (nodesEl) nodesEl.textContent = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
+        const dEff = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
+        const aEff = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
+        if (effEl) effEl.textContent = `${dEff.toFixed(1)}% / ${aEff.toFixed(1)}%`;
         const insightsDiv = document.getElementById('performanceInsights');
-        insightsDiv.innerHTML = `
-            <div class="insight-item"><strong>Comparison Results:</strong></div>
-            <div class="insight-item">Faster: ${comparison.faster_algorithm}</div>
-            <div class="insight-item">Shorter: ${comparison.shorter_path}</div>
-            <div class="insight-item">Time diff: ${comparison.time_difference.toFixed(2)}ms</div>
-        `;
-
-        // Update metrics with comparison data
-        document.getElementById('lastRouteAlgorithm').textContent = 'Comparison';
-        document.getElementById('lastExecutionTime').textContent = `D:${dijkstra.execution_time.toFixed(1)}ms / A*:${astar.execution_time.toFixed(1)}ms`;
-        document.getElementById('lastNodesExplored').textContent = `${dijkstra.nodes_explored} / ${astar.nodes_explored}`;
-
-        // Calculate efficiency ratios
-        const dijkstraEfficiency = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
-        const astarEfficiency = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
-        document.getElementById('lastEfficiency').textContent = `${dijkstraEfficiency.toFixed(1)}% / ${astarEfficiency.toFixed(1)}%`;
-
-        // After updating metrics also update chart (already handled after recording, keep in case order changes)
-        this.updateMiniComplexityChart();
-    }
-
-    updatePerformanceDisplay(result) {
-        // Update performance metrics from route result
-        if (result.performance_analysis) {
-            const analysis = result.performance_analysis.complexity_analysis;
-
-            document.getElementById('lastRouteAlgorithm').textContent = result.algorithm;
-            document.getElementById('lastExecutionTime').textContent = `${analysis.execution_time_ms.toFixed(2)}ms`;
-            document.getElementById('lastNodesExplored').textContent = analysis.nodes_explored;
-            document.getElementById('lastEfficiency').textContent = `${analysis.efficiency_ratio.toFixed(1)}%`;
-
-            // Update insights
-            const insights = analysis.performance_insights;
-            const insightsDiv = document.getElementById('performanceInsights');
-
-            if (insights && insights.length > 0) {
-                let insightsHtml = '';
-                insights.slice(0, 2).forEach(insight => {
-                    insightsHtml += `<div class="insight-item">${insight}</div>`;
-                });
-                insightsDiv.innerHTML = insightsHtml;
-            }
+        if (insightsDiv) {
+            insightsDiv.innerHTML = `
+                <div class="insight-item"><strong>Comparison Results</strong></div>
+                <div class="insight-item">Faster: ${comparison.faster_algorithm || '-'}</div>
+                <div class="insight-item">Shorter: ${comparison.shorter_path || '-'}</div>
+                <div class="insight-item">Time Δ: ${(comparison.time_difference||0).toFixed ? (comparison.time_difference).toFixed(2) : comparison.time_difference}ms</div>
+            `;
         }
-
-        // Keep chart fresh after single result updates
-        this.updateMiniComplexityChart();
     }
 }
 

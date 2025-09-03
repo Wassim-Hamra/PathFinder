@@ -382,65 +382,6 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* Car marker styles */
-.car-marker {
-    background: none !important;
-    border: none !important;
-}
-
-.car-container {
-    position: relative;
-    transition: transform 0.05s ease-out; /* Faster, smoother rotation */
-    transform-origin: center center;
-}
-
-/* Enhanced 3D car container styles */
-.car-marker-3d {
-    background: none !important;
-    border: none !important;
-    z-index: 1000 !important;
-}
-
-.car-container-3d {
-    position: relative;
-    transition: transform 0.08s ease-out; /* Smooth rotation for realistic cars */
-    transform-origin: center center;
-    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
-}
-
-.car-shadow-3d {
-    position: absolute;
-    bottom: -3px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 35px;
-    height: 12px;
-    background: radial-gradient(ellipse, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.1) 70%, transparent 100%);
-    border-radius: 50%;
-    filter: blur(3px);
-    z-index: -1;
-}
-
-.car-shadow {
-    position: absolute;
-    bottom: -2px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 20px;
-    height: 8px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 50%;
-    filter: blur(2px);
-}
-
-/* Car bounce animation for completion */
-@keyframes carBounce {
-    0%, 100% { transform: translateY(0) scale(1); }
-    25% { transform: translateY(-8px) scale(1.15); }
-    50% { transform: translateY(-12px) scale(1.2); }
-    75% { transform: translateY(-4px) scale(1.1); }
-}
-
 /* Enhanced marker positioning */
 .custom-marker {
     background: none;

@@ -15,8 +15,6 @@ class LeafletMapComponent {
         this.isInitialized = false;
         this.isZooming = false;
         this.currentAnimation = null;
-        this.carMarkers = []; // Track animated car markers
-        this.carAnimations = []; // Track car animation timeouts
 
         this.options = {
             defaultZoom: 13,
@@ -228,9 +226,6 @@ class LeafletMapComponent {
             this.routeLayer = null;
         }
 
-        // Clear car markers and animations
-        this.clearCarAnimations();
-
         // Clear any comparison route layers
         this.map.eachLayer((layer) => {
             if (layer instanceof L.Polyline && layer !== this.routeLayer) {
@@ -240,20 +235,6 @@ class LeafletMapComponent {
         });
 
         console.log('All routes cleared from map');
-    }
-
-    clearCarAnimations() {
-        // Stop all car animations
-        this.carAnimations.forEach(animation => {
-            if (animation) clearTimeout(animation);
-        });
-        this.carAnimations = [];
-
-        // Remove all car markers
-        this.carMarkers.forEach(marker => {
-            if (marker) this.map.removeLayer(marker);
-        });
-        this.carMarkers = [];
     }
 
     displayRoute(routeData) {
@@ -277,11 +258,6 @@ class LeafletMapComponent {
 
         // Animate the route drawing first (faster)
         this.animateRoute(routeData.coordinates, this.routeLayer);
-
-        // Start car animation sooner after route starts drawing
-        setTimeout(() => {
-            this.animateCar(routeData.coordinates, routeData.algorithm || 'default');
-        }, 500); // Reduced from 1000ms to 500ms
 
         // Fit map to show the entire route after animation starts
         setTimeout(() => {
@@ -332,130 +308,6 @@ class LeafletMapComponent {
         animate();
     }
 
-    animateCar(coordinates, algorithm) {
-        if (!coordinates || coordinates.length < 2) return;
-
-        // Create car marker
-        const carMarker = L.marker(coordinates[0], {
-            icon: this.createCarIcon(algorithm),
-            zIndexOffset: 1000 // Ensure car appears above route
-        }).addTo(this.map);
-
-        this.carMarkers.push(carMarker);
-
-        let currentIndex = 0;
-        let progress = 0; // Track progress between points
-        const carSpeed = 5; // Much faster timing (was 8ms)
-        const progressStep = 0.3; // Larger steps for faster movement (was 0.2)
-
-        const animateCar = () => {
-            if (currentIndex < coordinates.length - 1) {
-                const currentPos = coordinates[currentIndex];
-                const nextPos = coordinates[currentIndex + 1];
-
-                // Interpolate between current and next position
-                const lat = currentPos[0] + (nextPos[0] - currentPos[0]) * progress;
-                const lng = currentPos[1] + (nextPos[1] - currentPos[1]) * progress;
-
-                // Calculate bearing for car rotation
-                const bearing = this.calculateBearing(currentPos, nextPos);
-
-                // Update car position and rotation
-                carMarker.setLatLng([lat, lng]);
-                this.rotateCarIcon(carMarker, bearing);
-
-                // Advance progress
-                progress += progressStep;
-
-                // Move to next segment when current one is complete
-                if (progress >= 1) {
-                    progress = 0;
-                    currentIndex++;
-                }
-
-                const timeout = setTimeout(animateCar, carSpeed);
-                this.carAnimations.push(timeout);
-            } else {
-                // Car reached destination - add completion effect
-                this.addCarCompletionEffect(carMarker);
-            }
-        };
-
-        // Start car animation
-        animateCar();
-    }
-
-    rotateCarIcon(marker, bearing) {
-        const icon = marker.getElement();
-        if (icon) {
-            const carContainer = icon.querySelector('.car-container-3d') || icon.querySelector('.car-container');
-            if (carContainer) {
-                carContainer.style.transform = `rotate(${bearing}deg)`;
-            }
-        }
-    }
-
-    calculateBearing(start, end) {
-        const startLat = start[0] * Math.PI / 180;
-        const startLng = start[1] * Math.PI / 180;
-        const endLat = end[0] * Math.PI / 180;
-        const endLng = end[1] * Math.PI / 180;
-
-        const dLng = endLng - startLng;
-
-        const y = Math.sin(dLng) * Math.cos(endLat);
-        const x = Math.cos(startLat) * Math.sin(endLat) - Math.sin(startLat) * Math.cos(endLat) * Math.cos(dLng);
-
-        let bearing = Math.atan2(y, x) * 180 / Math.PI;
-
-        // Normalize bearing to 0-360 degrees
-        bearing = (bearing + 360) % 360;
-
-        return bearing;
-    }
-
-    addCarCompletionEffect(carMarker) {
-        // Add a smooth bounce effect when car reaches destination
-        const icon = carMarker.getElement();
-        if (icon) {
-            // Stop any ongoing rotation animations first
-            const carContainer = icon.querySelector('.car-container-3d') || icon.querySelector('.car-container');
-            if (carContainer) {
-                carContainer.style.transition = 'transform 0.3s ease-out';
-            }
-
-            // Add bounce animation
-            icon.style.animation = 'carBounce 0.6s ease-in-out';
-            icon.style.animationFillMode = 'forwards';
-
-            // Clean up animation and stabilize the car
-            setTimeout(() => {
-                if (icon && icon.parentNode) {
-                    icon.style.animation = '';
-                    icon.style.animationFillMode = '';
-                    // Reset transform to prevent glitching
-                    if (carContainer) {
-                        carContainer.style.transition = '';
-                        carContainer.style.transform = 'rotate(0deg) scale(1)';
-                    }
-                }
-            }, 600);
-
-            // Add a subtle final pulse effect
-            setTimeout(() => {
-                if (icon && icon.parentNode) {
-                    icon.style.transform = 'scale(1.1)';
-                    setTimeout(() => {
-                        if (icon && icon.parentNode) {
-                            icon.style.transform = 'scale(1)';
-                            icon.style.transition = 'transform 0.2s ease-out';
-                        }
-                    }, 200);
-                }
-            }, 700);
-        }
-    }
-
     addRouteCompletionEffect(polyline) {
         // Simplified completion effect - just a subtle weight increase
         const originalWeight = polyline.options.weight;
@@ -490,11 +342,8 @@ class LeafletMapComponent {
                 </div>
             `);
 
-            // Animate Dijkstra route and car (faster timing)
+            // Animate Dijkstra route (faster timing)
             this.animateComparisonRoute(dijkstraResult.coordinates, dijkstraLayer, 0);
-            setTimeout(() => {
-                this.animateCar(dijkstraResult.coordinates, 'dijkstra');
-            }, 400); // Reduced from 800ms to 400ms
         }
 
         // Display A* route with reduced delay
@@ -516,11 +365,8 @@ class LeafletMapComponent {
                     </div>
                 `);
 
-                // Animate A* route and car (faster timing)
+                // Animate A* route (faster timing)
                 this.animateComparisonRoute(astarResult.coordinates, astarLayer, 0);
-                setTimeout(() => {
-                    this.animateCar(astarResult.coordinates, 'astar');
-                }, 400); // Reduced from 800ms to 400ms
             }, 800); // Reduced from 1500ms to 800ms
         }
 
@@ -589,55 +435,6 @@ class LeafletMapComponent {
 
     hasValidSelection() {
         return this.selectedStart && this.selectedEnd;
-    }
-
-    createCarIcon(algorithm) {
-        const colors = {
-            dijkstra: '#dc2626',  // Red car for Dijkstra
-            astar: '#2563eb',     // Blue car for A*
-            default: '#22c55e'    // Green car for single algorithm
-        };
-
-        const color = colors[algorithm] || colors.default;
-        const shadowColor = this.darkenColor(color, 0.3);
-
-        return L.divIcon({
-            className: 'car-marker-3d',
-            html: `
-                <div class="car-container-3d" style="transform: rotate(0deg);">
-                    <svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
-                        <!-- Car Shadow -->
-                        <ellipse cx="16" cy="28" rx="12" ry="2" fill="rgba(0,0,0,0.3)"/>
-                        
-                        <!-- Car Body -->
-                        <rect x="6" y="12" width="20" height="10" rx="2" fill="${color}" stroke="white" stroke-width="1"/>
-                        
-                        <!-- Car Roof -->
-                        <rect x="10" y="8" width="12" height="8" rx="3" fill="${color}" stroke="white" stroke-width="1"/>
-                        
-                        <!-- Windshield -->
-                        <rect x="10" y="8" width="12" height="3" rx="2" fill="#87CEEB" opacity="0.8"/>
-                        
-                        <!-- Headlights -->
-                        <circle cx="24" cy="14" r="1.5" fill="#FFFFFF" stroke="#DDD"/>
-                        <circle cx="24" cy="18" r="1.5" fill="#FFFFFF" stroke="#DDD"/>
-                        
-                        <!-- Rear lights -->
-                        <circle cx="8" cy="14" r="1" fill="#FF4444"/>
-                        <circle cx="8" cy="18" r="1" fill="#FF4444"/>
-                        
-                        <!-- Wheels -->
-                        <circle cx="11" cy="23" r="2.5" fill="#333" stroke="#666"/>
-                        <circle cx="21" cy="23" r="2.5" fill="#333" stroke="#666"/>
-                        <circle cx="11" cy="23" r="1.5" fill="#666"/>
-                        <circle cx="21" cy="23" r="1.5" fill="#666"/>
-                    </svg>
-                    <div class="car-shadow-3d"></div>
-                </div>
-            `,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16]
-        });
     }
 
     darkenColor(color, factor) {

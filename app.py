@@ -1,8 +1,6 @@
 from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import time
-import math
-from typing import List, Dict
 import requests
 from algorithms.dijkstra import dijkstra_pathfinding
 from algorithms.astar import astar_pathfinding
@@ -12,152 +10,9 @@ from algorithms.performance_tracker import PerformanceTracker
 app = Flask(__name__)
 CORS(app)
 
-# Store performance data for analysis
-performance_history = []
-
 @app.route('/')
 def index():
     return render_template('index.html')
-
-@app.route('/api/performance-analysis')
-def get_performance_analysis():
-    """Get detailed performance analysis of recent algorithm runs"""
-    if not performance_history:
-        return jsonify({'error': 'No performance data available. Run some routes first!'})
-
-    # Get the latest runs for analysis
-    latest_runs = performance_history[-10:]  # Last 10 runs
-
-    analysis = {
-        'recent_runs': [],
-        'algorithm_insights': {},
-        'complexity_summary': {}
-    }
-
-    dijkstra_runs = []
-    astar_runs = []
-
-    for run in latest_runs:
-        if run['algorithm'].lower() == 'dijkstra':
-            dijkstra_runs.append(run)
-        elif run['algorithm'].lower() == 'astar':
-            astar_runs.append(run)
-
-        analysis['recent_runs'].append({
-            'algorithm': run['algorithm'],
-            'execution_time_ms': run['execution_time_ms'],
-            'nodes_explored': run['nodes_explored'],
-            'graph_size': run['graph_size'],
-            'efficiency_ratio': run['efficiency_ratio']
-        })
-
-    # Generate algorithm-specific insights
-    if dijkstra_runs:
-        analysis['algorithm_insights']['dijkstra'] = _analyze_algorithm_performance(dijkstra_runs, 'Dijkstra')
-
-    if astar_runs:
-        analysis['algorithm_insights']['astar'] = _analyze_algorithm_performance(astar_runs, 'A*')
-
-    # Generate complexity summary
-    analysis['complexity_summary'] = _generate_complexity_summary(dijkstra_runs, astar_runs)
-
-    return jsonify(analysis)
-
-def _analyze_algorithm_performance(runs: List[Dict], algorithm_name: str) -> Dict:
-    """Analyze performance characteristics of an algorithm"""
-    if not runs:
-        return {}
-
-    avg_time = sum(run['execution_time_ms'] for run in runs) / len(runs)
-    avg_nodes = sum(run['nodes_explored'] for run in runs) / len(runs)
-    avg_efficiency = sum(run['efficiency_ratio'] for run in runs) / len(runs)
-
-    graph_sizes = [run['graph_size'] for run in runs]
-    times = [run['execution_time_ms'] for run in runs]
-
-    # Calculate correlation between graph size and execution time
-    correlation = _calculate_correlation(graph_sizes, times)
-
-    return {
-        'algorithm': algorithm_name,
-        'average_execution_time_ms': round(avg_time, 2),
-        'average_nodes_explored': round(avg_nodes, 1),
-        'average_efficiency_ratio': round(avg_efficiency, 2),
-        'performance_correlation': {
-            'size_time_correlation': round(correlation, 3),
-            'complexity_behavior': _interpret_correlation(correlation, algorithm_name)
-        },
-        'runs_analyzed': len(runs)
-    }
-
-def _calculate_correlation(x_values: List, y_values: List) -> float:
-    """Calculate Pearson correlation coefficient"""
-    if len(x_values) < 2:
-        return 0
-
-    n = len(x_values)
-    sum_x = sum(x_values)
-    sum_y = sum(y_values)
-    sum_xy = sum(x * y for x, y in zip(x_values, y_values))
-    sum_x2 = sum(x * x for x in x_values)
-    sum_y2 = sum(y * y for y in y_values)
-
-    numerator = n * sum_xy - sum_x * sum_y
-    denominator = math.sqrt((n * sum_x2 - sum_x * sum_x) * (n * sum_y2 - sum_y * sum_y))
-
-    return numerator / denominator if denominator != 0 else 0
-
-def _interpret_correlation(correlation: float, algorithm: str) -> str:
-    """Interpret correlation coefficient in context of algorithm complexity"""
-    if correlation > 0.8:
-        return f"{algorithm} shows strong correlation with graph size - follows expected O(n log n) behavior"
-    elif correlation > 0.5:
-        return f"{algorithm} shows moderate correlation - generally follows expected complexity"
-    elif correlation > 0.2:
-        return f"{algorithm} shows weak correlation - performance varies with other factors"
-    else:
-        return f"{algorithm} shows little correlation with graph size - other factors dominate"
-
-def _generate_complexity_summary(dijkstra_runs: List[Dict], astar_runs: List[Dict]) -> Dict:
-    """Generate overall complexity analysis summary"""
-    summary = {
-        "time_complexity": {
-            "dijkstra": {
-                "big_o": "O((V + E) log V)",
-                "explanation": "Uses binary heap for priority queue, explores all reachable nodes",
-                "factors": ["Graph density", "Number of vertices", "Edge weights distribution"]
-            },
-            "astar": {
-                "big_o": "O(b^d) where b=branching factor, d=depth",
-                "explanation": "Heuristic-guided search, performance depends on heuristic quality",
-                "factors": ["Heuristic accuracy", "Graph topology", "Goal location"]
-            }
-        },
-        "space_complexity": {
-            "dijkstra": {
-                "big_o": "O(V)",
-                "explanation": "Stores distances, previous nodes, visited set, and priority queue"
-            },
-            "astar": {
-                "big_o": "O(V)",
-                "explanation": "Stores g_score, f_score, came_from, and open set"
-            }
-        },
-        "practical_insights": []
-    }
-
-    if dijkstra_runs and astar_runs:
-        avg_dijkstra_time = sum(run['execution_time_ms'] for run in dijkstra_runs) / len(dijkstra_runs)
-        avg_astar_time = sum(run['execution_time_ms'] for run in astar_runs) / len(astar_runs)
-
-        if avg_astar_time < avg_dijkstra_time:
-            speedup = avg_dijkstra_time / avg_astar_time
-            summary['practical_insights'].append(f"A* is {speedup:.1f}x faster than Dijkstra on average")
-        else:
-            speedup = avg_astar_time / avg_dijkstra_time
-            summary['practical_insights'].append(f"Dijkstra is {speedup:.1f}x faster than A* on average")
-
-    return summary
 
 @app.route('/api/find-route', methods=['POST'])
 def find_route():
@@ -298,21 +153,6 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
         # Get detailed performance analysis
         complexity_analysis = tracker.get_time_complexity_analysis()
         space_analysis = tracker.get_space_complexity_analysis()
-
-        # Store performance data for historical analysis
-        performance_data = {
-            'algorithm': algorithm,
-            'execution_time_ms': complexity_analysis.get('execution_time_ms', 0),
-            'nodes_explored': tracker.nodes_explored,
-            'graph_size': tracker.graph_size,
-            'efficiency_ratio': complexity_analysis.get('efficiency_ratio', 0) if complexity_analysis.get('efficiency_ratio') is not None else 0,
-            'timestamp': time.time()
-        }
-        performance_history.append(performance_data)
-
-        # Keep only last 100 runs to prevent memory bloat
-        if len(performance_history) > 100:
-            performance_history.pop(0)
 
         # Prepare result with enhanced performance data
         result = {

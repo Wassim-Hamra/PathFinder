@@ -1,9 +1,7 @@
 // Algorithm execution and visualization functionality for real map routing
 class AlgorithmManager {
     constructor() {
-        this.isRunning = false;
         this.currentResults = null;
-        this.testResults = [];
 
         this.setupEventListeners();
     }
@@ -73,13 +71,9 @@ class AlgorithmManager {
             use_real_streets: true
         };
 
-        console.log('Finding route with:', requestData);
-
         const response = await fetch('/api/find-route', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestData)
         });
 
@@ -88,7 +82,6 @@ class AlgorithmManager {
         }
 
         const result = await response.json();
-        console.log('Route result:', result);
 
         if (result.error) {
             throw new Error(result.error);
@@ -105,7 +98,11 @@ class AlgorithmManager {
         this.updatePerformanceDisplay(result);
 
         // Show success message with route details
-        this.showRouteDetails(result);
+        this.showSuccess(
+            `Route found using ${result.algorithm}! ` +
+            `Distance: ${result.total_distance} km, ` +
+            `Duration: ${result.duration_minutes} minutes`
+        );
     }
 
     async compareRoutes() {
@@ -116,13 +113,9 @@ class AlgorithmManager {
             use_real_streets: true
         };
 
-        console.log('Comparing routes with:', requestData);
-
         const response = await fetch('/api/find-route', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestData)
         });
 
@@ -131,7 +124,6 @@ class AlgorithmManager {
         }
 
         const result = await response.json();
-        console.log('Comparison result:', result);
 
         if (result.error) {
             throw new Error(result.error);
@@ -148,20 +140,6 @@ class AlgorithmManager {
         this.updateComparisonPerformance(result);
 
         // Show comparison details
-        this.showComparisonDetails(result);
-    }
-
-    showRouteDetails(result) {
-        const algorithm = result.algorithm.charAt(0).toUpperCase() + result.algorithm.slice(1);
-
-        this.showSuccess(
-            `Route found using ${algorithm}! ` +
-            `Distance: ${result.total_distance} km, ` +
-            `Duration: ${result.duration_minutes} minutes`
-        );
-    }
-
-    showComparisonDetails(result) {
         const comparison = result.comparison;
         const dijkstra = result.dijkstra;
         const astar = result.astar;
@@ -231,9 +209,6 @@ class AlgorithmManager {
         // Show complexity display, hide performance
         document.getElementById('complexityDisplay').style.display = 'block';
         document.getElementById('performanceDisplay').style.display = 'none';
-
-        // Animate the mini chart bars
-        this.animateMiniChart();
     }
 
     showPerformanceMetrics() {
@@ -244,16 +219,6 @@ class AlgorithmManager {
         // Show performance display, hide complexity
         document.getElementById('performanceDisplay').style.display = 'block';
         document.getElementById('complexityDisplay').style.display = 'none';
-    }
-
-    animateMiniChart() {
-        // Add animation classes to mini bars
-        const miniBars = document.querySelectorAll('.mini-bar');
-        miniBars.forEach((bar, index) => {
-            setTimeout(() => {
-                bar.style.transition = 'height 0.8s ease-out';
-            }, index * 100);
-        });
     }
 
     updatePerformanceDisplay(result) {
@@ -304,30 +269,6 @@ class AlgorithmManager {
         const dijkstraEfficiency = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
         const astarEfficiency = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
         document.getElementById('lastEfficiency').textContent = `${dijkstraEfficiency.toFixed(1)}% / ${astarEfficiency.toFixed(1)}%`;
-    }
-
-    updateComplexityVisualization(result) {
-        // Update the mini chart with actual performance data
-        if (result.performance_analysis) {
-            const analysis = result.performance_analysis.complexity_analysis;
-
-            // Update algorithm-specific bars based on actual performance
-            const algorithm = result.algorithm.toLowerCase();
-            const efficiencyRatio = analysis.efficiency_ratio || 0;
-
-            // Animate bars based on efficiency (lower is better for exploration)
-            const barHeight = Math.max(10, 100 - efficiencyRatio); // Invert for visualization
-
-            if (algorithm === 'dijkstra') {
-                document.querySelectorAll('.dijkstra-mini').forEach(bar => {
-                    bar.style.height = `${barHeight}%`;
-                });
-            } else if (algorithm === 'astar') {
-                document.querySelectorAll('.astar-mini').forEach(bar => {
-                    bar.style.height = `${barHeight}%`;
-                });
-            }
-        }
     }
 }
 

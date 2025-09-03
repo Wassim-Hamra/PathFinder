@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request
 from flask_cors import CORS
 import time
 import requests
+import os  # added for Heroku PORT
 from algorithms.dijkstra import dijkstra_pathfinding
 from algorithms.astar import astar_pathfinding
 from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
@@ -257,6 +258,7 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
         return {'error': f'Algorithm execution failed: {str(e)}'}
 
 if __name__ == '__main__':
-    print("Starting Route Optimizer Application...")
-    print("Open http://localhost:5000 in your browser")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    debug = bool(os.environ.get('FLASK_DEBUG', '').lower() in ('1', 'true', 'yes'))
+    print(f"Starting PathFinder on 0.0.0.0:{port} (debug={debug})")
+    app.run(host='0.0.0.0', port=port, debug=debug)

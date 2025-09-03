@@ -97,8 +97,18 @@
                                             </div>
                                         </div>
 
+                                        <div class="mb-2">
+                                            <label for="complexityMetricSelect" class="form-label small mb-1">Chart Metric</label>
+                                            <select id="complexityMetricSelect" class="form-select form-select-sm">
+                                                <option value="nodes_explored" selected>Nodes Explored</option>
+                                                <option value="edges_relaxed">Edges Relaxed (Dijkstra)</option>
+                                                <option value="heuristic_calls">Heuristic Calls (A*)</option>
+                                                <option value="priority_queue_operations">Priority Queue Ops</option>
+                                            </select>
+                                        </div>
+
                                         <div class="mini-chart" id="miniComplexityChart">
-                                            <div class="chart-title">Node Exploration Efficiency</div>
+                                            <div class="chart-title" id="miniChartTitle">Node Exploration Efficiency</div>
                                             <div class="mini-bars">
                                                 <div class="mini-bar-group" data-group="1">
                                                     <div class="mini-bar dijkstra-mini" data-algo="dijkstra"></div>

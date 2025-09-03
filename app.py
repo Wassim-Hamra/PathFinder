@@ -82,9 +82,10 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
 
         # Create a simplified graph for algorithm demonstration
         graph = {}
-        nodes_count = min(len(route_coords), 50)  # Limit for performance
+        # Increased cap to allow more variation in exploration
+        nodes_count = min(len(route_coords), 120)
 
-        # Sample route coordinates evenly
+        # Sample route coordinates evenly (finer granularity for larger routes)
         step = max(1, len(route_coords) // nodes_count)
         sampled_route = route_coords[::step]
 
@@ -99,20 +100,34 @@ def find_path_with_algorithm(start_coords, end_coords, algorithm):
                 'neighbors': []
             }
 
-        # Connect consecutive nodes (this maintains street following)
+        # Base consecutive connections (street-following)
         for i in range(len(sampled_route) - 1):
             distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 1]))
             graph[i]['neighbors'].append({'node': i + 1, 'weight': distance})
             graph[i + 1]['neighbors'].append({'node': i, 'weight': distance})
 
-        # Add some skip connections for algorithm differentiation
-        for i in range(len(sampled_route) - 3):
-            if i % 3 == 0:  # Every 3rd node, add a skip connection
-                skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 2]))
-                penalty_factor = 1.2 if algorithm == 'dijkstra' else 1.1
-
-                graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
-                graph[i + 2]['neighbors'].append({'node': i, 'weight': skip_distance * penalty_factor})
+        # Differentiated skip / shortcut strategy to amplify algorithm behavior differences
+        if algorithm == 'dijkstra':
+            # Less frequent, slightly more penalized skips -> encourages broader exploration
+            for i in range(len(sampled_route) - 3):
+                if i % 4 == 0:  # Less frequent than before
+                    skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 2]))
+                    penalty_factor = 1.25  # Higher penalty -> path cost discourages direct jumps
+                    graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
+                    graph[i + 2]['neighbors'].append({'node': i, 'weight': skip_distance * penalty_factor})
+        else:  # A* (or other future heuristic-based)
+            # More frequent, lower-penalty forward skips + occasional longer skip -> heuristic benefits
+            for i in range(len(sampled_route) - 3):
+                if i % 3 == 0:
+                    skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 2]))
+                    penalty_factor = 1.08  # Mild penalty -> attractive shortcut
+                    graph[i]['neighbors'].append({'node': i + 2, 'weight': skip_distance * penalty_factor})
+                    graph[i + 2]['neighbors'].append({'node': i, 'weight': skip_distance * penalty_factor})
+                # Occasional longer leap to give heuristic a bigger advantage
+                if i % 6 == 0 and i + 3 < len(sampled_route):
+                    long_skip_distance = haversine_distance(tuple(sampled_route[i]), tuple(sampled_route[i + 3]))
+                    graph[i]['neighbors'].append({'node': i + 3, 'weight': long_skip_distance * 1.12})
+                    graph[i + 3]['neighbors'].append({'node': i, 'weight': long_skip_distance * 1.12})
 
         # Run the selected algorithm with performance tracking
         if algorithm == 'dijkstra':

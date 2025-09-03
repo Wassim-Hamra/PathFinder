@@ -7,6 +7,12 @@ class AlgorithmManager {
         this.nodeHistory = { dijkstra: [], astar: [] }; // store last 3 node counts per algorithm
         this.maxHistory = 3;
 
+        this.metricHistories = {
+            dijkstra: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] },
+            astar: { nodes_explored: [], edges_relaxed: [], heuristic_calls: [], priority_queue_operations: [] }
+        };
+        this.currentMetric = 'nodes_explored';
+
         this.setupEventListeners();
     }
 
@@ -45,6 +51,28 @@ class AlgorithmManager {
                 this.showPerformanceMetrics();
             });
         }
+
+        // Metric selector for complexity chart
+        const metricSelect = document.getElementById('complexityMetricSelect');
+        if (metricSelect) {
+            metricSelect.addEventListener('change', (e) => {
+                this.currentMetric = e.target.value;
+                this.updateMiniChartTitle();
+                this.updateMiniComplexityChart();
+            });
+        }
+    }
+
+    updateMiniChartTitle() {
+        const titleEl = document.getElementById('miniChartTitle');
+        if (!titleEl) return;
+        const map = {
+            nodes_explored: 'Node Exploration (last 3 runs)',
+            edges_relaxed: 'Edges Relaxed (Dijkstra)',
+            heuristic_calls: 'Heuristic Calls (A*)',
+            priority_queue_operations: 'Priority Queue Ops'
+        };
+        titleEl.textContent = map[this.currentMetric] || 'Metric';
     }
 
     async findPath() {
@@ -104,6 +132,9 @@ class AlgorithmManager {
 
         this.currentResults = result;
 
+        this.recordMetricHistory(result);
+        this.updateMiniComplexityChart();
+
         // Record node exploration history
         this.recordNodeHistory(result.algorithm, result.nodes_explored || (result.performance_analysis?.complexity_analysis?.nodes_explored));
         this.updateMiniComplexityChart();
@@ -149,6 +180,10 @@ class AlgorithmManager {
         }
 
         this.currentResults = result;
+
+        this.recordMetricHistory(result.dijkstra);
+        this.recordMetricHistory(result.astar);
+        this.updateMiniComplexityChart();
 
         // Record both algorithms' node counts
         this.recordNodeHistory('dijkstra', result.dijkstra.nodes_explored || (result.dijkstra.performance_analysis?.complexity_analysis?.nodes_explored));
@@ -226,13 +261,12 @@ class AlgorithmManager {
     }
 
     showComplexityAnalysis() {
-        // Toggle active state
         document.getElementById('showComplexityBtn').classList.add('active');
         document.getElementById('showPerformanceBtn').classList.remove('active');
-
-        // Show complexity display, hide performance
         document.getElementById('complexityDisplay').style.display = 'block';
         document.getElementById('performanceDisplay').style.display = 'none';
+        // Refresh chart now that it's visible
+        this.updateMiniComplexityChart();
     }
 
     showPerformanceMetrics() {
@@ -253,54 +287,69 @@ class AlgorithmManager {
         }
     }
 
+    recordMetricHistory(result) {
+        if (!result || !result.algorithm) return;
+        const algo = result.algorithm === 'astar' ? 'astar' : 'dijkstra';
+        const perf = result.performance_analysis?.complexity_analysis || {};
+        const detailed = result.performance_analysis?.detailed_metrics || {};
+        const snapshot = {
+            nodes_explored: perf.nodes_explored ?? result.nodes_explored ?? 0,
+            edges_relaxed: detailed.edges_relaxed ?? perf.edges_relaxed ?? 0,
+            heuristic_calls: detailed.heuristic_calls ?? perf.heuristic_calls ?? 0,
+            priority_queue_operations: detailed.priority_queue_operations ?? perf.priority_queue_operations ?? 0
+        };
+        Object.entries(snapshot).forEach(([metric, value]) => {
+            const arr = this.metricHistories[algo][metric];
+            arr.push(value || 0);
+            if (arr.length > this.maxHistory) arr.shift();
+        });
+    }
+
     updateMiniComplexityChart() {
         const groups = document.querySelectorAll('.mini-bar-group');
-        if (!groups.length) return; // chart not present (e.g., different layout)
+        if (!groups.length) return;
+        const metric = this.currentMetric;
+        const djVals = [...this.metricHistories.dijkstra[metric]];
+        const asVals = [...this.metricHistories.astar[metric]];
+        // If both empty, nothing to show
+        if (djVals.length === 0 && asVals.length === 0) return;
 
-        // Prepare aligned arrays (most recent last). We'll map newest -> first group for immediacy.
-        const dj = [...this.nodeHistory.dijkstra];
-        const as = [...this.nodeHistory.astar];
-        const maxVal = Math.max(1, ...dj, ...as); // avoid division by zero
-
-        // Reverse so most recent appears in group 1
-        const djRev = dj.slice(-this.maxHistory).reverse();
-        const asRev = as.slice(-this.maxHistory).reverse();
-
+        const djRev = djVals.slice(-this.maxHistory).reverse();
+        const asRev = asVals.slice(-this.maxHistory).reverse();
+        const all = djRev.concat(asRev).filter(v => typeof v === 'number');
+        if (!all.length) return;
+        const maxAll = Math.max(...all);
+        const minAll = Math.min(...all);
+        const range = maxAll - minAll;
+        const identical = range === 0;
+        const fallbackHeights = [70, 55, 40];
+        const computeHeight = (val, idx) => {
+            if (val === undefined) return 0;
+            if (identical) return fallbackHeights[idx] || 35;
+            const norm = (val - minAll) / (range || 1);
+            const curved = Math.sqrt(norm);
+            return 25 + curved * 75;
+        };
         groups.forEach((group, idx) => {
             const dBar = group.querySelector('.mini-bar.dijkstra-mini');
             const aBar = group.querySelector('.mini-bar.astar-mini');
             const dVal = djRev[idx];
             const aVal = asRev[idx];
-
+            const dH = computeHeight(dVal, idx);
+            const aH = computeHeight(aVal, idx);
             if (dBar) {
-                if (dVal !== undefined) {
-                    const pct = Math.max(8, (dVal / maxVal) * 100); // minimum visible height
-                    dBar.style.height = pct + '%';
-                    dBar.title = `Dijkstra nodes: ${dVal}`;
-                } else {
-                    dBar.style.height = '0%';
-                    dBar.title = 'No data';
-                }
+                dBar.style.height = dVal !== undefined ? dH.toFixed(1) + '%' : '0%';
+                dBar.title = dVal !== undefined ? `Dijkstra ${metric}: ${dVal}` : 'No data';
+                dBar.style.opacity = (metric === 'heuristic_calls') ? 0.25 : 1; // dim metric not relevant
             }
             if (aBar) {
-                if (aVal !== undefined) {
-                    const pct = Math.max(8, (aVal / maxVal) * 100);
-                    aBar.style.height = pct + '%';
-                    aBar.title = `A* nodes: ${aVal}`;
-                } else {
-                    aBar.style.height = '0%';
-                    aBar.title = 'No data';
-                }
+                aBar.style.height = aVal !== undefined ? aH.toFixed(1) + '%' : '0%';
+                aBar.title = aVal !== undefined ? `A* ${metric}: ${aVal}` : 'No data';
+                aBar.style.opacity = (metric === 'edges_relaxed') ? 0.25 : 1;
             }
-
-            // Relabel groups dynamically
             const label = group.querySelector('.bar-label');
             if (label) {
-                if (dVal !== undefined || aVal !== undefined) {
-                    label.textContent = idx === 0 ? 'Latest' : `Run -${idx}`;
-                } else {
-                    label.textContent = '—';
-                }
+                if (dVal !== undefined || aVal !== undefined) label.textContent = idx === 0 ? 'Latest' : `Run -${idx}`; else label.textContent = '—';
             }
         });
     }

@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}PathFinder{% endblock %}</title>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -25,8 +29,10 @@
 <body>
     <nav class="navbar navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="/">
-                🗺️ PathFinder
+            <a class="navbar-brand d-flex align-items-center" href="/">
+                <img src="{{ url_for('static', filename='icons/favicon.svg') }}?v=1" alt="PathFinder Logo" class="app-logo me-2" width="28" height="28" onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';" />
+                <span class="logo-fallback badge bg-primary" style="display:none;">PF</span>
+                <span>PathFinder</span>
             </a>
             <div class="navbar-nav flex-row">
                 <a class="nav-link me-3" href="/">Home</a>

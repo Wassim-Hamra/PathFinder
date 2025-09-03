@@ -897,6 +897,11 @@ body {
     background: #dc3545;
 }
 
+/* Added missing bidirectional legend dot */
+.bidirectional-dot {
+    background: #8b5cf6;
+}
+
 /* Performance Metrics Styles */
 .metric-row {
     display: flex;
@@ -1025,4 +1030,28 @@ canvas#trendChart {
 
 .mini-visual-charts .legend-dot {
     width:10px;height:10px;
+}
+
+/* PathFinder - Custom Styles */
+.app-logo {
+    width: 28px;
+    height: 28px;
+    display: inline-block;
+    object-fit: contain;
+    border-radius: 6px; /* subtle rounding */
+    box-shadow: 0 0 4px rgba(0,0,0,0.25);
+}
+
+.app-logo-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+}
+
+.app-logo-wrapper svg {
+    width: 28px;
+    height: 28px;
+    display: block;
 }

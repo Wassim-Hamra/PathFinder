@@ -2,15 +2,24 @@
 class AlgorithmManager {
     constructor() {
         this.currentResults = null;
+        this.noControls = false; // flag if controls are absent
+
+        this.nodeHistory = { dijkstra: [], astar: [] }; // store last 3 node counts per algorithm
+        this.maxHistory = 3;
 
         this.setupEventListeners();
     }
 
     setupEventListeners() {
-        // Find path button
-        document.getElementById('findPathBtn').addEventListener('click', () => {
-            this.findPath();
-        });
+        // Find path button (may not exist in fullscreen minimal mode)
+        const findBtn = document.getElementById('findPathBtn');
+        if (findBtn) {
+            findBtn.addEventListener('click', () => {
+                this.findPath();
+            });
+        } else {
+            this.noControls = true;
+        }
 
         // Clear selection button
         const clearBtn = document.getElementById('clearSelectionBtn');
@@ -23,14 +32,19 @@ class AlgorithmManager {
             });
         }
 
-        // Complexity analysis toggle buttons
-        document.getElementById('showComplexityBtn').addEventListener('click', () => {
-            this.showComplexityAnalysis();
-        });
-
-        document.getElementById('showPerformanceBtn').addEventListener('click', () => {
-            this.showPerformanceMetrics();
-        });
+        // Complexity / performance buttons
+        const complexityBtn = document.getElementById('showComplexityBtn');
+        const performanceBtn = document.getElementById('showPerformanceBtn');
+        if (complexityBtn) {
+            complexityBtn.addEventListener('click', () => {
+                this.showComplexityAnalysis();
+            });
+        }
+        if (performanceBtn) {
+            performanceBtn.addEventListener('click', () => {
+                this.showPerformanceMetrics();
+            });
+        }
     }
 
     async findPath() {
@@ -47,7 +61,8 @@ class AlgorithmManager {
         this.showLoading(true);
 
         try {
-            const algorithm = document.getElementById('algorithmSelect').value;
+            const algoSelect = document.getElementById('algorithmSelect');
+            const algorithm = algoSelect ? algoSelect.value : 'dijkstra';
 
             if (algorithm === 'compare') {
                 await this.compareRoutes();
@@ -88,6 +103,10 @@ class AlgorithmManager {
         }
 
         this.currentResults = result;
+
+        // Record node exploration history
+        this.recordNodeHistory(result.algorithm, result.nodes_explored || (result.performance_analysis?.complexity_analysis?.nodes_explored));
+        this.updateMiniComplexityChart();
 
         // Display the route on the map
         if (window.leafletMap && window.leafletMap.displayRoute) {
@@ -130,6 +149,11 @@ class AlgorithmManager {
         }
 
         this.currentResults = result;
+
+        // Record both algorithms' node counts
+        this.recordNodeHistory('dijkstra', result.dijkstra.nodes_explored || (result.dijkstra.performance_analysis?.complexity_analysis?.nodes_explored));
+        this.recordNodeHistory('astar', result.astar.nodes_explored || (result.astar.performance_analysis?.complexity_analysis?.nodes_explored));
+        this.updateMiniComplexityChart();
 
         // Display comparison routes on the map
         if (window.leafletMap && window.leafletMap.displayComparison) {
@@ -221,28 +245,64 @@ class AlgorithmManager {
         document.getElementById('complexityDisplay').style.display = 'none';
     }
 
-    updatePerformanceDisplay(result) {
-        // Update performance metrics from route result
-        if (result.performance_analysis) {
-            const analysis = result.performance_analysis.complexity_analysis;
-
-            document.getElementById('lastRouteAlgorithm').textContent = result.algorithm;
-            document.getElementById('lastExecutionTime').textContent = `${analysis.execution_time_ms.toFixed(2)}ms`;
-            document.getElementById('lastNodesExplored').textContent = analysis.nodes_explored;
-            document.getElementById('lastEfficiency').textContent = `${analysis.efficiency_ratio.toFixed(1)}%`;
-
-            // Update insights
-            const insights = analysis.performance_insights;
-            const insightsDiv = document.getElementById('performanceInsights');
-
-            if (insights && insights.length > 0) {
-                let insightsHtml = '';
-                insights.slice(0, 2).forEach(insight => {
-                    insightsHtml += `<div class="insight-item">${insight}</div>`;
-                });
-                insightsDiv.innerHTML = insightsHtml;
-            }
+    recordNodeHistory(algo, value) {
+        if (!value || !this.nodeHistory[algo]) return;
+        this.nodeHistory[algo].push(value);
+        if (this.nodeHistory[algo].length > this.maxHistory) {
+            this.nodeHistory[algo].shift();
         }
+    }
+
+    updateMiniComplexityChart() {
+        const groups = document.querySelectorAll('.mini-bar-group');
+        if (!groups.length) return; // chart not present (e.g., different layout)
+
+        // Prepare aligned arrays (most recent last). We'll map newest -> first group for immediacy.
+        const dj = [...this.nodeHistory.dijkstra];
+        const as = [...this.nodeHistory.astar];
+        const maxVal = Math.max(1, ...dj, ...as); // avoid division by zero
+
+        // Reverse so most recent appears in group 1
+        const djRev = dj.slice(-this.maxHistory).reverse();
+        const asRev = as.slice(-this.maxHistory).reverse();
+
+        groups.forEach((group, idx) => {
+            const dBar = group.querySelector('.mini-bar.dijkstra-mini');
+            const aBar = group.querySelector('.mini-bar.astar-mini');
+            const dVal = djRev[idx];
+            const aVal = asRev[idx];
+
+            if (dBar) {
+                if (dVal !== undefined) {
+                    const pct = Math.max(8, (dVal / maxVal) * 100); // minimum visible height
+                    dBar.style.height = pct + '%';
+                    dBar.title = `Dijkstra nodes: ${dVal}`;
+                } else {
+                    dBar.style.height = '0%';
+                    dBar.title = 'No data';
+                }
+            }
+            if (aBar) {
+                if (aVal !== undefined) {
+                    const pct = Math.max(8, (aVal / maxVal) * 100);
+                    aBar.style.height = pct + '%';
+                    aBar.title = `A* nodes: ${aVal}`;
+                } else {
+                    aBar.style.height = '0%';
+                    aBar.title = 'No data';
+                }
+            }
+
+            // Relabel groups dynamically
+            const label = group.querySelector('.bar-label');
+            if (label) {
+                if (dVal !== undefined || aVal !== undefined) {
+                    label.textContent = idx === 0 ? 'Latest' : `Run -${idx}`;
+                } else {
+                    label.textContent = '—';
+                }
+            }
+        });
     }
 
     updateComparisonPerformance(result) {
@@ -269,6 +329,36 @@ class AlgorithmManager {
         const dijkstraEfficiency = dijkstra.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
         const astarEfficiency = astar.performance_analysis?.complexity_analysis?.efficiency_ratio || 0;
         document.getElementById('lastEfficiency').textContent = `${dijkstraEfficiency.toFixed(1)}% / ${astarEfficiency.toFixed(1)}%`;
+
+        // After updating metrics also update chart (already handled after recording, keep in case order changes)
+        this.updateMiniComplexityChart();
+    }
+
+    updatePerformanceDisplay(result) {
+        // Update performance metrics from route result
+        if (result.performance_analysis) {
+            const analysis = result.performance_analysis.complexity_analysis;
+
+            document.getElementById('lastRouteAlgorithm').textContent = result.algorithm;
+            document.getElementById('lastExecutionTime').textContent = `${analysis.execution_time_ms.toFixed(2)}ms`;
+            document.getElementById('lastNodesExplored').textContent = analysis.nodes_explored;
+            document.getElementById('lastEfficiency').textContent = `${analysis.efficiency_ratio.toFixed(1)}%`;
+
+            // Update insights
+            const insights = analysis.performance_insights;
+            const insightsDiv = document.getElementById('performanceInsights');
+
+            if (insights && insights.length > 0) {
+                let insightsHtml = '';
+                insights.slice(0, 2).forEach(insight => {
+                    insightsHtml += `<div class="insight-item">${insight}</div>`;
+                });
+                insightsDiv.innerHTML = insightsHtml;
+            }
+        }
+
+        // Keep chart fresh after single result updates
+        this.updateMiniComplexityChart();
     }
 }
 
@@ -276,6 +366,9 @@ class AlgorithmManager {
 document.addEventListener('DOMContentLoaded', () => {
     window.algorithmManager = new AlgorithmManager();
 
-    // Set default display to complexity analysis
-    document.getElementById('showComplexityBtn').click();
+    // Only trigger default view if buttons exist
+    const complexityBtn = document.getElementById('showComplexityBtn');
+    if (complexityBtn) {
+        complexityBtn.click();
+    }
 });

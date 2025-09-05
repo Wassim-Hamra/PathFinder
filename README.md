@@ -6,6 +6,10 @@
   An interactive Flask web application to explore and compare shortest-path algorithms (Dijkstra, A*, Bidirectional Dijkstra) on real-world street data. It fetches actual drivable routes via the public **OSRM API**, then derives a simplified graph model to highlight algorithmic behavior, performance, and complexity in a simplified manner.
 </p>
 
+<p align="center">
+  <a href="https://path-finder-algo-714aa39360b9.herokuapp.com/" target="_blank" rel="noopener noreferrer">Live Demo — PathFinder Webapp</a>
+</p>
+
 ---
 
 ## 🛠️ Technologies Used
@@ -232,7 +236,7 @@ export FLASK_DEBUG=1  # (Windows PowerShell: $Env:FLASK_DEBUG=1)
 python app.py
 
 # 4. Open
-http://localhost:5000
+http://localhost:5000  # Or view the live demo at: https://path-finder-algo-714aa39360b9.herokuapp.com/
 ```
 
 ---
@@ -241,4 +245,3 @@ http://localhost:5000
 |---------|-------|-----|
 | No path returned | OSRM transient issue | Retry; choose nearby street nodes |
 | All algorithms similar | Short route | choose longer route |
-

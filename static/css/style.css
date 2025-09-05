@@ -40,7 +40,6 @@ body {
     scrollbar-width: none; /* Hide scrollbar for Firefox */
 }
 
-/* Hide any nested scrollbars inside sidebar (fallback enforcement) */
 .col-md-3, .col-md-3 * {
     scrollbar-width: none !important;
 }

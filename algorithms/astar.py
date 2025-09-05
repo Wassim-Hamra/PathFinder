@@ -1,5 +1,4 @@
 import heapq
-import time
 from typing import Dict, List, Tuple, Optional
 from .graph_utils import haversine_distance
 from .performance_tracker import PerformanceTracker

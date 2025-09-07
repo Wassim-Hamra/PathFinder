@@ -804,6 +804,57 @@ canvas#trendChart {
     display: block;
 }
 
-/* Removed unused modern branding overrides after revert */
-/* .app-main-nav, .nav-inner, .nav-branding, .app-logo-modern, .logo-text-wrapper, .logo-text-primary, .logo-tagline,
-   .nav-links .nav-link, .app-panel-header, .pf-brand-icon, .pf-brand-text, .pf-title, .pf-subtitle were part of the experimental redesign */
+/* Overview / Welcome Modal Enhancements */
+.overview-modal .modal-content {
+    border: none;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 16px 48px rgba(2, 6, 23, 0.35);
+}
+.overview-modal .modal-header {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    border-bottom: none;
+}
+.overview-modal .modal-title {
+    font-weight: 700;
+    letter-spacing: -0.3px;
+}
+.overview-modal .modal-title .fa-route { color: #fff; opacity: 0.95; }
+.overview-modal .btn-close { filter: invert(1) grayscale(1) brightness(2); }
+.overview-modal .modal-body {
+    background:
+      radial-gradient(1200px 400px at 100% -50%, rgba(59,130,246,.08), rgba(0,0,0,0) 60%),
+      radial-gradient(1000px 400px at -30% 0%, rgba(139,92,246,.08), rgba(0,0,0,0) 60%),
+      #ffffff;
+}
+.overview-modal .modal-body p { font-size: 0.98rem; }
+.overview-modal .modal-body ul {
+    margin: 0 0 0.25rem 0;
+    padding: 0;
+    list-style: none;
+}
+.overview-modal .modal-body li {
+    position: relative;
+    padding-left: 28px;
+    margin: 8px 0;
+}
+.overview-modal .modal-body li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    box-shadow: 0 2px 6px rgba(22,163,74,0.35);
+}
+.overview-modal .modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid #eef2f7;
+}
+.overview-modal .btn.btn-primary {
+    padding: 0.5rem 1rem;
+    border-radius: 10px;
+}

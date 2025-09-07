@@ -211,6 +211,52 @@
     <script src="{{ url_for('static', filename='js/leaflet_map.js') }}"></script>
     <script src="{{ url_for('static', filename='js/algorithms.js') }}"></script>
 
+    <!-- Welcome / Overview Modal -->
+    <div class="modal fade overview-modal" id="overviewModal" tabindex="-1" aria-labelledby="overviewModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title d-flex align-items-center" id="overviewModalLabel">
+              <i class="fas fa-route me-2"></i>
+              Welcome to PathFinder
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">PathFinder finds real street routes and compares pathfinding algorithms.</p>
+            <ul class="mb-2">
+              <li>Click the map to set Start, then click again to set End.</li>
+              <li>Pick an algorithm (Dijkstra, A*, Bidirectional) or Compare All.</li>
+              <li>Press "Find Route" to see the path and analysis.</li>
+            </ul>
+            <p class="text-muted small mb-0">Tip: Drag to pan, scroll to zoom. Click the map again to start a new route.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Start exploring</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto-show overview on load and fix Leaflet sizing after close -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var modalEl = document.getElementById('overviewModal');
+        if (!modalEl) return;
+        var modal = new bootstrap.Modal(modalEl, { backdrop: 'static', keyboard: true });
+        // Show shortly after load so the map can initialize in the background
+        setTimeout(function(){ modal.show(); }, 150);
+        // After closing the modal, ensure Leaflet recalculates size
+        modalEl.addEventListener('hidden.bs.modal', function(){
+          setTimeout(function(){
+            if (window.leafletMap && window.leafletMap.map) {
+              try { window.leafletMap.map.invalidateSize(false); } catch (e) {}
+            }
+          }, 100);
+        });
+      });
+    </script>
+
     <!-- Credit Footer -->
     <div class="credit-footer">
         Created with <span class="heart" aria-label="love">♥</span> by <a href="https://www.linkedin.com/in/wassimhamra/" target="_blank" rel="noopener noreferrer">Wassim Hamra</a>

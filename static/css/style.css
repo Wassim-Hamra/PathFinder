@@ -358,6 +358,16 @@ body {
         width: 32px;
         height: 40px;
     }
+
+    .gauge-row {
+        gap: 8px;
+    }
+
+    .gauge-container {
+        flex: 1 1 48%;
+        max-width: 48%;
+        min-width: 120px;
+    }
 }
 
 /* Smooth transitions for all interactive elements */
@@ -739,46 +749,33 @@ small, .small { font-size: 0.78rem; letter-spacing: .15px; }
 
 .gauge-row {
     display: flex;
-    justify-content: space-around;
+    justify-content: center; /* center gauges and avoid edge clipping */
     align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .gauge-container {
     position: relative;
-    width: 120px;
-    height: 140px;
+    flex: 1 1 110px; /* grow/shrink with min basis */
+    min-width: 96px;
+    max-width: 140px;
     text-align: center;
 }
 
-.gauge-label {
-    font-size: 0.65rem;
-    font-weight: 600;
-    margin-top: -4px;
-    color: #495057;
-}
-
-canvas#trendChart {
-    width: 100% !important;
-    background: linear-gradient(180deg,#ffffff,#f1f5f9);
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-}
-
 .gauge-container canvas {
+    display: block; /* remove inline whitespace */
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 1 / 1;
     background: radial-gradient(circle at 50% 55%, #ffffff 0%, #f1f5f9 70%);
     border: 1px solid #e2e8f0;
     border-radius: 50%;
     box-shadow: inset 0 2px 4px rgba(0,0,0,0.05),0 1px 2px rgba(0,0,0,0.06);
 }
 
-.mini-legend {
-    font-size: 0.6rem;
-    gap: 1.25rem;
-}
-
-.mini-visual-charts .legend-dot {
-    width:10px;height:10px;
-}
+/* Contain any overflow just in case */
+.mini-visual-charts { overflow: hidden; }
 
 /* PathFinder - Custom Styles */
 .app-logo {

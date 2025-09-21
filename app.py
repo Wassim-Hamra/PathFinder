@@ -10,7 +10,7 @@ from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
 import logging
 import newrelic.agent
-from newrelic.agent import add_custom_parameter
+from newrelic.agent import add_custom_parameter, current_transaction
 from ip2geotools.databases.noncommercial import DbIpCity
 from functools import lru_cache
 import threading
@@ -40,8 +40,13 @@ def log_country_async(ip):
 @app.before_request
 def log_visitor_country():
     visitor_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
-    # Run lookup in a separate thread to avoid slowing the request
-    threading.Thread(target=log_country_async, args=(visitor_ip,)).start()
+    country = get_country_from_ip(visitor_ip)
+
+    logging.info(f"Visitor IP={visitor_ip}, Country={country}")
+
+    txn = current_transaction()
+    if txn:
+        txn.add_custom_parameter("country", country)
 @app.route('/')
 def index():
     return render_template('index.html')

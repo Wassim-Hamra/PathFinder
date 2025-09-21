@@ -9,26 +9,35 @@ from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
 from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
 import logging
-import newrelic.agent
+
+from newrelic.agent import add_custom_parameter
+from ip2geotools.databases.noncommercial import DbIpCity
+
 newrelic.agent.initialize()
 
 logging.basicConfig(level=logging.INFO)
 
-
+def get_country_from_ip(ip):
+    try:
+        response = DbIpCity.get(ip, api_key='free')
+        return response.country
+    except Exception as e:
+        logging.warning(f"Could not resolve IP {ip}: {e}")
+        return "Unknown"
 app = Flask(__name__)
 CORS(app)
 
 
-
 @app.before_request
-def log_request_info():
-    if request.path.startswith("/static/"):
-        return  # skip logging static assets
+def log_visitor_country():
+    visitor_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
+    country = get_country_from_ip(visitor_ip)
 
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    ref = request.headers.get("Referer", "direct")
-    ua = request.headers.get("User-Agent", "unknown")
-    app.logger.info(f"Visitor IP={ip}, Referer={ref}, UserAgent={ua}")
+    # Log to Python logs (will appear in New Relic logs)
+    logging.info(f"Visitor IP={visitor_ip}, Country={country}")
+
+    # Add as a custom New Relic attribute
+    add_custom_parameter("country", country)
 @app.route('/')
 def index():
     return render_template('index.html')

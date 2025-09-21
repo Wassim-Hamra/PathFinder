@@ -12,11 +12,18 @@ import logging
 import newrelic.agent
 from newrelic.agent import add_custom_parameter
 from ip2geotools.databases.noncommercial import DbIpCity
+from functools import lru_cache
+import threading
 
 newrelic.agent.initialize()
 
 logging.basicConfig(level=logging.INFO)
 
+app = Flask(__name__)
+CORS(app)
+
+
+@lru_cache(maxsize=1000)
 def get_country_from_ip(ip):
     try:
         response = DbIpCity.get(ip, api_key='free')
@@ -24,20 +31,17 @@ def get_country_from_ip(ip):
     except Exception as e:
         logging.warning(f"Could not resolve IP {ip}: {e}")
         return "Unknown"
-app = Flask(__name__)
-CORS(app)
 
+def log_country_async(ip):
+    country = get_country_from_ip(ip)
+    add_custom_parameter("country", country)
+    logging.info(f"Visitor IP={ip}, Country={country}")
 
 @app.before_request
 def log_visitor_country():
     visitor_ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0]
-    country = get_country_from_ip(visitor_ip)
-
-    # Log to Python logs (will appear in New Relic logs)
-    logging.info(f"Visitor IP={visitor_ip}, Country={country}")
-
-    # Add as a custom New Relic attribute
-    add_custom_parameter("country", country)
+    # Run lookup in a separate thread to avoid slowing the request
+    threading.Thread(target=log_country_async, args=(visitor_ip,)).start()
 @app.route('/')
 def index():
     return render_template('index.html')

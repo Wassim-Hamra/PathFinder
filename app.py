@@ -21,6 +21,9 @@ CORS(app)
 
 @app.before_request
 def log_request_info():
+    if request.path.startswith("/static/"):
+        return  # skip logging static assets
+
     ip = request.headers.get("X-Forwarded-For", request.remote_addr)
     ref = request.headers.get("Referer", "direct")
     ua = request.headers.get("User-Agent", "unknown")

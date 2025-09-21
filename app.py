@@ -9,9 +9,10 @@ from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
 from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
 import logging
+import newrelic.agent
+newrelic.agent.initialize()
 
 logging.basicConfig(level=logging.INFO)
-
 
 
 app = Flask(__name__)

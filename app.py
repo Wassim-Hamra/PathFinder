@@ -9,7 +9,7 @@ from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
 from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
 import logging
-
+import newrelic.agent
 from newrelic.agent import add_custom_parameter
 from ip2geotools.databases.noncommercial import DbIpCity
 

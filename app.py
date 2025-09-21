@@ -8,10 +8,23 @@ from algorithms.astar import astar_pathfinding
 from algorithms.bidirectional import bidirectional_dijkstra_pathfinding
 from algorithms.graph_utils import haversine_distance
 from algorithms.performance_tracker import PerformanceTracker
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+
 
 app = Flask(__name__)
 CORS(app)
 
+
+
+@app.before_request
+def log_request_info():
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+    ref = request.headers.get("Referer", "direct")
+    ua = request.headers.get("User-Agent", "unknown")
+    app.logger.info(f"Visitor IP={ip}, Referer={ref}, UserAgent={ua}")
 @app.route('/')
 def index():
     return render_template('index.html')

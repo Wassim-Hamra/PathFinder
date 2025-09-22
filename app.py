@@ -47,6 +47,7 @@ def log_visitor_country():
     txn = current_transaction()
     if txn:
         txn.add_custom_parameter("country", country)
+        txn.add_custom_parameter("client_ip", visitor_ip)
 @app.route('/')
 def index():
     return render_template('index.html')
